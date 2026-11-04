@@ -26,7 +26,7 @@ def session(day):
     elif day.weekday() >= 5 or key in HOLIDAYS:
         return None
     else:
-        opening, closing = '09:15', '15:40'
+        opening, closing = '09:15', '15:30'
     return tuple(datetime.fromisoformat(key + 'T' + t).replace(tzinfo=IST)
                  for t in (opening, closing))
 

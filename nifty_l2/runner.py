@@ -17,6 +17,7 @@ import uuid
 from types import SimpleNamespace
 
 from . import fyers
+from .data_quality import validate_calls
 from .storage import Store, canonical, digest, timestamp
 
 
@@ -53,10 +54,11 @@ def evaluate_once(store, client, now=None, *, run_id=None, scheduled_at=None, tr
         state = module.poll_and_evaluate()
         if state.get('status') != 'OK' or state.get('error'):
             raise RuntimeError('Market data was incomplete; no new result was saved')
+        quality = validate_calls(client.calls, now)
         event_id = store.event(conn, observed_at=now, kind='scheduled_research' if trigger == 'scheduled' else 'manual_research', source='fyers-read-only',
                                status='LEGACY_UNVALIDATED', payload={
                                    'run_id': run_id, 'scheduled_at_utc': scheduled_at,
-                                   'calls': client.calls, 'engine_sha256': digest(source.read_text()),
+                                   'calls': client.calls, 'input_quality': quality, 'engine_sha256': digest(source.read_text()),
                                    'configuration': {k: getattr(module, k) for k in (
                                        'ACTIVE_INDEX', 'NIFTY_LOT_SIZE', 'NIFTY_STRIKE_STEP',
                                        'MAX_ALLOWED_SPREAD', 'DEFAULT_STOP_PTS', 'TOP5_WEIGHTS',
