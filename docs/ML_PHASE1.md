@@ -11,7 +11,7 @@ From the project directory:
 .venv/bin/python -m nifty_l2.ml_dataset --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db --out /home/ubuntu/nifty-ml-research-20261104.csv
 ```
 
-The source SQLite file is opened read-only. The exporter refuses to overwrite an existing output CSV. Each row represents one stored research event, not one completed three-minute candle. Manual observations remain identified by event type in SQLite but this first export does not yet expose that type as a column; separate them before training.
+The source SQLite file is opened read-only. The exporter refuses to overwrite an existing output CSV. Each row represents one stored research event, not one completed three-minute candle. The event_kind column distinguishes scheduled from manual observations; separate them before training.
 
 ## Data contract
 
