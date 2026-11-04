@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 import sqlite3
 
-FIELDS = ('event_id','observed_at_utc','exchange_at_utc','quality_status',
+FIELDS = ('event_id','event_kind','observed_at_utc','exchange_at_utc','quality_status',
           'original_verdict','bull_score','bear_score','spot','fut_close','vix',
           'gex_scenario','put_wall','call_wall','seller_lead',
           'bull_checks_pass','bear_checks_pass','unavailable_checks',
@@ -32,7 +32,7 @@ def extract(db_path):
     with sqlite3.connect(db_path.as_uri() + '?mode=ro', uri=True) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
-            SELECT e.event_id,e.observed_at_utc,e.exchange_at_utc,e.status,
+            SELECT e.event_id,e.kind AS event_kind,e.observed_at_utc,e.exchange_at_utc,e.status,
                    e.payload_json,s.payload_json AS signal_json
             FROM events e JOIN signals s ON s.event_id=e.event_id
             WHERE e.kind IN ('scheduled_research','manual_research')
@@ -61,6 +61,7 @@ def extract(db_path):
                       else 'INCOMPLETE_OR_UNVERIFIED')
             result.append(dict(
                 event_id=event['event_id'],
+                event_kind=event['event_kind'],
                 observed_at_utc=event['observed_at_utc'],
                 exchange_at_utc=event['exchange_at_utc'] or '',
                 quality_status=event['status'],
