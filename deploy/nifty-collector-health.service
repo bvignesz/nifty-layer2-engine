@@ -1,0 +1,14 @@
+[Unit]
+Description=Read-only NIFTY scheduled collection health audit
+After=nifty-collector.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/nifty-layer2-engine
+ExecStart=/home/ubuntu/nifty-layer2-engine/.venv/bin/python -m nifty_l2.collector_health --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true

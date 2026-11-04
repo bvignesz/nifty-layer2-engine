@@ -1,0 +1,10 @@
+[Unit]
+Description=Check NIFTY collector at 09:45 IST on weekdays
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 09:45:00 Asia/Kolkata
+Persistent=true
+Unit=nifty-collector-health.service
+
+[Install]
+WantedBy=timers.target
