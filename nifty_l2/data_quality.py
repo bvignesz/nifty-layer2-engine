@@ -56,6 +56,19 @@ def validate_calls(calls, observed_at, *, max_futures_age_seconds=600):
     symbol = history['request'].get('symbol')
     if not isinstance(symbol, str) or not symbol.endswith('FUT'):
         raise MarketDataQualityError('Futures contract identity missing')
+    # A quoted futures contract must match the OI history contract. A
+    # rollover mismatch must not silently combine two expiries.
+    futures_quotes = [item for call in calls if call.get('method') == 'quotes'
+                      for item in call.get('response', {}).get('d', [])
+                      if isinstance(item, dict) and str(item.get('n', '')).endswith('FUT')
+                      and isinstance(item.get('v'), dict)
+                      and isinstance(item['v'].get('lp'), (int, float))
+                      and math.isfinite(item['v']['lp']) and item['v']['lp'] > 0]
+    if not futures_quotes:
+        raise MarketDataQualityError('No usable futures quote to confirm contract')
+    quoted_symbols = {item['n'] for item in futures_quotes}
+    if symbol not in quoted_symbols:
+        raise MarketDataQualityError('Futures rollover mismatch between quote and OI history')
     candles = history.get('response', {}).get('candles', [])
     if not isinstance(candles, list) or not candles:
         raise MarketDataQualityError('Futures OI candles unavailable')
