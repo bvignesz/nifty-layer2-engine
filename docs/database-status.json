@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "integrity_check": [
+    "ok"
+  ],
+  "foreign_key_violations": [],
+  "counts": {
+    "events": 0,
+    "option_snapshots": 0,
+    "futures_data": 0,
+    "check_results": 0,
+    "signals": 0,
+    "outcomes": 0,
+    "import_files": 0,
+    "import_rows": 0,
+    "header_snapshots": 0,
+    "strike_snapshots": 0
+  },
+  "database": "/home/ubuntu/.local/share/nifty-layer2/nifty.db"
+}

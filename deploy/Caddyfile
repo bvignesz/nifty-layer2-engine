@@ -1,0 +1,17 @@
+{
+	admin off
+	default_sni 13.211.127.67
+	auto_https disable_redirects
+}
+
+https://13.211.127.67 {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			profile shortlived
+			disable_http_challenge
+		}
+	}
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy 127.0.0.1:8080
+}

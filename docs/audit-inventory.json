@@ -1,0 +1,174 @@
+{
+  "reachable_commits_scanned": [
+    "e6ae4b24460dfdd2ddd14a7fe89d077c5f3e134e",
+    "1c01c50ab3151af269741037ce5d2a6712001c16"
+  ],
+  "credential_findings": [
+    {
+      "location": "e6ae4b24460dfdd2ddd14a7fe89d077c5f3e134e:final.ipynb:cell4",
+      "line": 7,
+      "names": [
+        "FYERS_CLIENT_ID"
+      ],
+      "fingerprint": "dbbb64528b61",
+      "type": "literal credential or identifier"
+    },
+    {
+      "location": "e6ae4b24460dfdd2ddd14a7fe89d077c5f3e134e:final.ipynb:cell4",
+      "line": 8,
+      "names": [
+        "FYERS_SECRET_KEY"
+      ],
+      "fingerprint": "c511d1d3afe6",
+      "type": "literal credential or identifier"
+    },
+    {
+      "location": "e6ae4b24460dfdd2ddd14a7fe89d077c5f3e134e:final.ipynb:cell4:output",
+      "type": "token in output",
+      "fingerprint": "1a09608e85a6"
+    }
+  ],
+  "cells": [
+    {
+      "cell": 0,
+      "type": "markdown",
+      "line_count": 1,
+      "output_count": 0,
+      "storage_operations": []
+    },
+    {
+      "cell": 1,
+      "type": "code",
+      "line_count": 2,
+      "output_count": 1,
+      "storage_operations": []
+    },
+    {
+      "cell": 2,
+      "type": "code",
+      "line_count": 1,
+      "output_count": 0,
+      "storage_operations": []
+    },
+    {
+      "cell": 3,
+      "type": "code",
+      "line_count": 25,
+      "output_count": 1,
+      "storage_operations": [
+        {
+          "line": 12,
+          "operation": "urllib.request.urlretrieve("
+        },
+        {
+          "line": 16,
+          "operation": "os.chmod(cf_path, 0o755)"
+        },
+        {
+          "line": 20,
+          "operation": "if not os.path.ismount('/content/drive'):"
+        },
+        {
+          "line": 21,
+          "operation": "drive.mount('/content/drive')"
+        },
+        {
+          "line": 23,
+          "operation": "SAVE_DIR = \"/content/drive/MyDrive/Nifty50_Option_Engine\""
+        },
+        {
+          "line": 24,
+          "operation": "os.makedirs(SAVE_DIR, exist_ok=True)"
+        }
+      ]
+    },
+    {
+      "cell": 4,
+      "type": "code",
+      "line_count": 54,
+      "output_count": 1,
+      "storage_operations": []
+    },
+    {
+      "cell": 5,
+      "type": "code",
+      "line_count": 2013,
+      "output_count": 2,
+      "storage_operations": [
+        {
+          "line": 297,
+          "operation": "SAVE_DIR = \"/content/drive/MyDrive/Nifty50_Option_Engine\""
+        },
+        {
+          "line": 298,
+          "operation": "os.makedirs(SAVE_DIR, exist_ok=True)"
+        },
+        {
+          "line": 428,
+          "operation": "with sqlite3.connect(DB_PATH) as conn:"
+        },
+        {
+          "line": 476,
+          "operation": "with open(SIGNALS_CSV_PATH, \"w\", newline=\"\") as f:"
+        },
+        {
+          "line": 477,
+          "operation": "csv.writer(f).writerow(expected_header)"
+        },
+        {
+          "line": 504,
+          "operation": "with open(AUDIT_CSV_PATH, \"w\", newline=\"\") as f:"
+        },
+        {
+          "line": 505,
+          "operation": "csv.writer(f).writerow(audit_header)"
+        },
+        {
+          "line": 803,
+          "operation": "with sqlite3.connect(DB_PATH) as conn:"
+        },
+        {
+          "line": 996,
+          "operation": "pd.DataFrame(live_rows).to_csv(LIVE_CSV_PATH, index=False)"
+        },
+        {
+          "line": 1643,
+          "operation": "pd.DataFrame(scorecard_rows).to_csv(SCORECARD_CSV_PATH, index=False)"
+        },
+        {
+          "line": 1653,
+          "operation": "with open(SIGNALS_CSV_PATH, \"a\", newline=\"\") as f:"
+        },
+        {
+          "line": 1654,
+          "operation": "csv.writer(f).writerow(["
+        },
+        {
+          "line": 1684,
+          "operation": "os.fsync(f.fileno())"
+        },
+        {
+          "line": 1686,
+          "operation": "with open(AUDIT_CSV_PATH, \"a\", newline=\"\") as af_csv:"
+        },
+        {
+          "line": 1687,
+          "operation": "csv.writer(af_csv).writerow(["
+        },
+        {
+          "line": 1712,
+          "operation": "os.fsync(af_csv.fileno())"
+        },
+        {
+          "line": 1713,
+          "operation": "os.sync()"
+        },
+        {
+          "line": 1983,
+          "operation": "tunnel_p = subprocess.Popen("
+        }
+      ]
+    }
+  ],
+  "scope": "All files in all refs reachable from this local clone; no inaccessible server refs or deleted remote objects."
+}
