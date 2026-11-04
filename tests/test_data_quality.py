@@ -39,3 +39,17 @@ def test_incomplete_futures_candle_is_rejected():
     calls[4]['response']['candles'][-1][0] = int((now - timedelta(seconds=30)).timestamp())
     with pytest.raises(MarketDataQualityError, match='incomplete'):
         validate_calls(calls, now)
+
+
+def test_futures_rollover_mismatch_is_rejected():
+    now, calls = inputs()
+    calls[4]['request']['symbol'] = 'NSE:NIFTY26DECFUT'
+    with pytest.raises(MarketDataQualityError, match='rollover mismatch'):
+        validate_calls(calls, now)
+
+
+def test_missing_futures_quote_is_rejected():
+    now, calls = inputs()
+    calls[3]['response']['d'] = []
+    with pytest.raises(MarketDataQualityError, match='futures quote'):
+        validate_calls(calls, now)
