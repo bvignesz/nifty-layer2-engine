@@ -296,3 +296,25 @@ $PY -m nifty_l2.gamma_model_parity \
 ```
 
 Rates, forward, IV units and theta conventions differ by vendor; a hypothetical constant forward across 111 observations is too weak to certify a broker. GEX magnitude remains `OI_UNITS_UNVERIFIED` until authoritative evidence (e.g. time-aligned independently sourced NSE contract counts or an explicit supported FYERS API contract specification) resolves the incoming quantity units. Actual dealer inventory signs are never inferable from total open interest alone.
+
+## Futures-quote-bracketed option Greeks capture
+
+A new optional `nifty_l2.synchronized_greeks_capture` samples FYERS option-chain expiration, then an exact-symbol NIFTY futures quote, option-chain Greeks and option OI, and finally the same futures quote. Both futures prices and request/receipt timestamps are stored in a private, create-only research JSON. If the quote bracket exceeds 30 seconds or the futures quote moves more than 0.1%, the outcome is `UNSTABLE_QUOTE_BRACKET`. It performs **four read-only API calls**, no orders, and does not update the existing SQLite database.
+
+The quote bracket is **not exchange synchronization**. The futures quote is at best a proxy for the option-pricing forward. The expiry code returned by FYERS is not an independently established exact pricing expiry cutoff, and this tool **does not calculate Black-76 parity unless** an explicit, independently checked expiry cutoff is supplied. Even with that value, the comparison is clearly marked model-unverified and requires contemporaneous forward verification.
+
+Run once in market hours with a valid FYERS token and fresh output path (the file cannot be overwritten):
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_synchronized_greeks_capture.py
+$PY -m nifty_l2.synchronized_greeks_capture --live \
+  --future-symbol NSE:NIFTY26NOVFUT \
+  --token-path /home/ubuntu/.config/nifty-layer2/fyers-token.json \
+  --report ~/nifty-validation-reports/greek-bracket-01.json
+```
+
+The result must be treated as research-only, not as approval for live trading, dealer GEX, or an automated order.
