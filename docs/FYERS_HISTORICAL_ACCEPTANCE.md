@@ -158,3 +158,25 @@ $PY -m nifty_l2.futures_oi_probe --live \
 ```
 
 The command remains **read-only** and makes one broker history request. No production deployment has occurred.
+
+## 5 November 2026 duplicate conflict investigation — second live probe
+
+The user's revised FYERS history probe confirms **128 duplicate bar-start rows**, split into **63 identical** and **65 conflicting** full OHLCV/OI signatures. These 65 are NOT necessarily 65 OI disagreements; differences may be in candle price, volume, or OI. Six tests for the prior probe passed on AWS. The 7 excluded bars are timestamped 15:39 IST: a full 3-minute candle would end at 15:42, after the configured NSE F&O 15:40 close. The option-chain audit found zero recognized candidate time fields across 5,328 legs and remains unverified.
+
+The refined probe now reports `conflicts_price_ohlc`, `conflicts_volume`, `conflicts_oi`, `conflicts_only_oi`, `conflicts_only_volume` and up to eight bounded `conflict_examples` with numeric OI/volume pairs. **Do not automatically keep first, keep last, average, or merge conflicting historical OHLCV/OI rows.** Fail closed for backtest labels/training until a documented broker-source correction policy is independently tested.
+
+Run from isolated worktree after fetching branch, using a NEW output file:
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_market_provenance.py
+$PY -m nifty_l2.futures_oi_probe --live \
+  --token-path /home/ubuntu/.config/nifty-layer2/fyers-token.json \
+  --future-symbol NSE:NIFTY26NOVFUT \
+  --report ~/nifty-validation-reports/futures-oi-conflict-breakdown.json
+```
+
+No live trading signals, production database changes or installs are authorized by this audit.
