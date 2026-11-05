@@ -68,3 +68,29 @@ With outstanding audit files absent or incomplete, this **must say BLOCKED**. Th
 Only after all required gates are independently verified: record production systemd unit definitions, backup SQLite via the SQLite backup API, record checkout SHA, test APIs/UI with a copy of the DB, then release only the approved commit to the web service with rollback, **without restarting the NIFTY collector or rewriting historical research**.
 
 No installation or merge is authorized by this development/validation runbook.
+
+## Historical futures persistence correction (2026-11-05)
+
+The AWS validation found 111 research events and 111 missing event-level exchange timestamps; `futures_data` had 0 rows. This is **not** enough to claim a missing futures feed: the existing `runner.evaluate_once` archives FYERS calls in `events.payload_json` but (unlike `replay.replay`) did not populate `futures_data`.
+
+The development branch now calls `persist_futures` inside the existing atomic research transaction to persist the **latest actual completed, bounded-age futures candle** with its source-provided candle-start UTC timestamp and OI. If no eligible completed candle with OI exists, no row is written. It **does not** set `events.exchange_at_utc` from a futures candle, and it never changes the nine-check valuation result.
+
+Inspect existing archived data **read only**:
+
+```bash
+cd ~/nifty-platform-validation
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m nifty_l2.futures_archive_audit \\
+  --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db \\
+  --report ~/nifty-validation-reports/futures-archive-audit.json
+```
+
+To assess recoverable futures records, use **copy-only** normalization (never live DB):
+
+```bash
+$PY -m nifty_l2.futures_copy_backfill \\
+  --source /home/ubuntu/.config/nifty-layer2/web-runtime/research.db \\
+  --output ~/nifty-validation-reports/research-futures-copy.db
+```
+
+This second command creates a new private SQLite copy and refuses overwrites. It does NOT install, merge, restart web/collector or mutate production. Neither backfill nor futures provenance can retroactively supply a valid option-chain exchange timestamp. The six historical collection gaps remain visible and are excluded from comparable three-minute change calculations. Existing market-quality gates remain blocked until trustworthy exchange-time evidence is available.
