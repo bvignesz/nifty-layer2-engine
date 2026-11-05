@@ -30,7 +30,14 @@ def render(directory,tab,params):
         html='<section><form><input type="date" name="date" value="'+esc(day)+'"><input type="number" name="strike" value="'+esc(strike)+'" min="1"><button>Load</button></form><h3>Real saved expiries only</h3><small>Missing W1/W2 expiries remain unavailable, not simulated.</small><table><tr>'+''.join('<th>'+x+'</th>' for x in cols)+'</tr>'+(''.join(rows) or '<tr><td>No saved contracts for this selection</td></tr>')+'</table></section>'
         return page("Expiry matrix",html)
     if tab=="eod":
-        return page("EOD scanner",'<section><h3>Not yet connected</h3><p>Separate FYERS EOD migration must preserve the original two-track RS–W%R3–POC strategy. No stock signals are fabricated.</p></section>')
+        from eod_scanner.readmodel import results
+        data=results(directory)
+        cols=("Symbol","As_Of","Strategy_Track","Research_State","Actionability",
+              "Close","RS_Excess_20D_Pct","Williams_R_3","Setup_POC",
+              "VAL","VAH","Stop_Loss_Structural","Risk_Reward_Ratio","Data_Quality")
+        rows=['<tr>'+''.join('<td>'+esc(r.get(k))+'</td>' for k in cols)+'</tr>' for r in data["rows"]]
+        html='<section><h3>Two-track EOD scanner · '+esc(data["status"])+ '</h3><small>FYERS research bridge; data adjustment parity unverified. No orders.</small><table><tr>'+''.join('<th>'+x+'</th>' for x in cols)+'</tr>'+(''.join(rows) or '<tr><td>No EOD scanner CSV available</td></tr>')+'</table></section>'
+        return page("EOD scanner",html)
     if tab=="validation":
         data=readiness(directory)
         return page("Validation readiness",'<section><table>'+''.join('<tr><th>'+esc(k)+'</th><td>'+esc(v)+'</td></tr>' for k,v in data.items())+'</table><p>No ML training until outcome labels and freshness are independently validated.</p></section>')
