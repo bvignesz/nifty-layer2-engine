@@ -50,3 +50,12 @@ def test_eod_csv_view_requires_actual_saved_output(tmp_path):
     actual=results(tmp_path)
     assert actual["status"]=="AVAILABLE"
     assert actual["rows"][0]["Symbol"]=="KIRLOSENG"
+
+def test_frozen_eod_v070_source_hash():
+    from pathlib import Path
+    import hashlib
+    path=Path(__file__).resolve().parents[1]/"eod_scanner"/"frozen"/"nifty500_rs_wpr_poc_screener_v0_7_0.py"
+    raw=path.read_bytes()
+    blob=hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\\0"+raw).hexdigest()
+    assert blob=="ae03d53867321d8b0771e6f0e56285a5b64e9ff2", (
+        "Frozen EOD strategy v0.7.0 changed; review before revising reference baseline")
