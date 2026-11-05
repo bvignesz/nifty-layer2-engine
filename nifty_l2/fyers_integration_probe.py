@@ -81,10 +81,14 @@ def evaluate_live(client, *, now=None,equity_symbol="NSE:TCS-EQ",future_symbol=N
                        and _positive(r[4]) and _positive(r[6])]
             else:
                 valid=normalize_ohlcv(raw,resolution,now)
-            ok=len(valid)>=1
-            steps.append(_status(name,ok,"Historical bars present" if ok else "No valid completed bars",
-                                 returned_rows=len(candles),usable_rows=len(valid),
-                                 futures_oi_present=bool(valid) if name=="futures_3m" else None))
+            required_bars=2 if name=="equity_daily" else 5
+            ok=len(valid)>=required_bars
+            steps.append(_status(name,ok,
+                "Sufficient basic historical bars for API smoke test" if ok else
+                "Too few valid completed historical bars to assess continuity",
+                returned_rows=len(candles),usable_rows=len(valid),
+                minimum_required=required_bars,
+                futures_oi_present=bool(valid) if name=="futures_3m" else None))
         except (RuntimeError,ValueError,TypeError,KeyError,OverflowError):
             steps.append(_status(name,False,"Historical API read or candle validation failed"))
     required={"profile","index_quote","actual_expiry_optionchain"}
@@ -121,7 +125,14 @@ def main(argv=None):
     if args.future_symbol and not args.future_symbol.startswith("NSE:"):
         p.error("Provide a reviewed NSE futures symbol")
     creds=load_token(args.token_path)
+    last_call=[0.0]
     def transport(operation,*,params=None,credentials=None):
+        # Standard FYERS quotas may be restrictive. Throttle even during a
+        # one-time probe and never retry rejected market-data requests blindly.
+        import time
+        elapsed=time.monotonic()-last_call[0]
+        if elapsed<0.35:time.sleep(0.35-elapsed)
+        last_call[0]=time.monotonic()
         return fyers.request(operation,params=params,credentials=creds)
     report=evaluate_live(transport,equity_symbol=args.equity_symbol,
                          future_symbol=args.future_symbol)
