@@ -21,7 +21,10 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
     result = {"status":"FAIL","raw_rows":0,"completed_rows":0,"unique_completed_bars":0,
               "positive_oi_bars":0,"missing_oi_bars":0,"invalid_ohlcv_bars":0,
               "unfinished_rows":0,"after_session_rows":0,"non_3min_spacing":0,
-              "duplicate_timestamps":0,"latest_bar_start_utc":None,
+              "duplicate_timestamps":0,"identical_duplicate_rows":0,
+              "conflicting_duplicate_rows":0,"missing_oi_unique_bars":0,
+              "after_session_samples_ist":[],"conflict_samples_ist":[],
+              "latest_bar_start_utc":None,
               "oldest_bar_start_utc":None,"option_exchange_time_verified":False,
               "note":"Exchange history timestamp is candle START, not a chain update time."}
     if not isinstance(response,dict) or response.get("s")!="ok":
@@ -34,6 +37,8 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
     result["raw_rows"]=len(bars)
     valid={}
     duplicates=0
+    identical_duplicates=0
+    conflicting_duplicates=0
     for bar in bars:
         if not isinstance(bar,(list,tuple)) or len(bar)<6:
             result["invalid_ohlcv_bars"]+=1
@@ -51,6 +56,8 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
         if start_local.date()!=close_local.date() or not (
             time(9,15)<=start_local.time() and close_local.time()<=time(15,40)):
             result["after_session_rows"]+=1
+            if len(result["after_session_samples_ist"]) < 12:
+                result["after_session_samples_ist"].append(start_local.isoformat())
             continue
         if close>asof.astimezone(timezone.utc):
             result["unfinished_rows"]+=1
@@ -63,17 +70,25 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
                 if isfinite(candidate) and candidate>0:oi=candidate
             except (TypeError,ValueError,OverflowError):
                 pass
+        signature=(o,h,l,c,v,oi)
         if start in valid:
             duplicates+=1
-            if oi is not None and valid[start] is None:
-                valid[start]=oi
+            if valid[start] == signature:
+                identical_duplicates+=1
+            else:
+                conflicting_duplicates+=1
+                if len(result["conflict_samples_ist"]) < 12:
+                    result["conflict_samples_ist"].append(start_local.isoformat())
         else:
-            valid[start]=oi
+            valid[start]=signature
         if oi is None:result["missing_oi_bars"]+=1
         else:result["positive_oi_bars"]+=1
     keys=sorted(valid)
     result["unique_completed_bars"]=len(keys)
     result["duplicate_timestamps"]=duplicates
+    result["identical_duplicate_rows"]=identical_duplicates
+    result["conflicting_duplicate_rows"]=conflicting_duplicates
+    result["missing_oi_unique_bars"]=sum(value[5] is None for value in valid.values())
     result["oldest_bar_start_utc"]=keys[0].isoformat() if keys else None
     result["latest_bar_start_utc"]=keys[-1].isoformat() if keys else None
     for old,new in zip(keys,keys[1:]):
@@ -81,8 +96,11 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
         # Overnight/session gaps are expected; only compare same IST day.
         if old.astimezone(IST).date()==new.astimezone(IST).date() and secs != resolution_minutes*60:
             result["non_3min_spacing"]+=1
-    enough=len(keys)>=5 and sum(v is not None for v in valid.values())>=5
-    result["status"]="FUTURES_HISTORY_OI_PRESENT_UNVERIFIED" if enough else "FAIL"
+    enough=len(keys)>=5 and sum(v[5] is not None for v in valid.values())>=5
+    if conflicting_duplicates:
+        result["status"]="FUTURES_HISTORY_CONFLICTS_REVIEW_REQUIRED"
+    else:
+        result["status"]="FUTURES_HISTORY_OI_PRESENT_UNVERIFIED" if enough else "FAIL"
     result["source"]="FYERS_HISTORY_READ_ONLY"
     return result
 
