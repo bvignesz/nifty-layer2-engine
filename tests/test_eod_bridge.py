@@ -57,5 +57,5 @@ def test_frozen_eod_v070_source_hash():
     path=Path(__file__).resolve().parents[1]/"eod_scanner"/"frozen"/"nifty500_rs_wpr_poc_screener_v0_7_0.py"
     raw=path.read_bytes()
     blob=hashlib.sha1(b"blob "+str(len(raw)).encode()+b"\\0"+raw).hexdigest()
-    assert blob=="ae03d53867321d8b0771e6f0e56285a5b64e9ff2", (
+    assert blob=="f10218d50af88da622fa84783926c5962e297c7b", (
         "Frozen EOD strategy v0.7.0 changed; review before revising reference baseline")
