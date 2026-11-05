@@ -180,3 +180,34 @@ $PY -m nifty_l2.futures_oi_probe --live \
 ```
 
 No live trading signals, production database changes or installs are authorized by this audit.
+
+## Option OI timing and GEX assumptions — 2026-11-05
+
+Authoritative FYERS Option Chain documentation:
+- https://fyers.in/api-docs/v3/api/market-data/option-chain
+- https://fyers.in/api-docs/ai/skills/option-chain/
+- https://fyers.in/community/t/option-chain-update-frequqency/21050
+
+**Critical:** FYERS option-chain request `timestamp` means the selected **expiry epoch**, not a historical exchange-time observation. FYERS support indicates that a time series must be stored locally or obtained through a separately suitable feed. Existing option-chain legs lacked exchange-time keys in all 5,328 inspected archived option legs. No historical 1/3-minute exchange-confirmed option OI candle can be retroactively produced from these snapshots.
+
+`nifty_l2.option_observation_gate` exposes `bracket_snapshot`, `snapshot_from_response`, and `comparable_pair`. A separately instrumented collector can record **request start and response completion** from monotonic wall clocks for each option-chain API call, expiry ID, contract symbol, and OI. Only same-expiry, same-universe, non-overlapping receipt-time captures separated by 90–360 seconds with reasonable request latency can produce `COMPARABLE_RECEIPT_DELTA_UNVERIFIED`. No exchange-time bar, seller position, or intraday exchange OI freshness is implied. This module is research scaffolding; it is NOT attached to the live legacy runner.
+
+`nifty_l2.gex_assumption_audit` estimates convention-specific signed OI GEX using FYERS-provided broker gamma where present and reveals the absence of direct dealer positions and independently verified option OI update times. Its `oi_basis` must be explicitly verified as **underlying units** vs **contracts** before using the numeric output. The engine's frozen default `NIFTY_LOT_SIZE=75` needs contract-specific verification: NSE/FAOP/70616 revised NIFTY standard lot from 75 to 65 for eligible contracts. Do not blindly replace lot size across historical/old contracts without contract-master validation.
+
+The legacy `net_gex_cr` multiplies gamma × received OI × F² × 0.01 / 1e7, with **CE positive / PE negative** convention; dealer actual net gamma is unknown. Also audit whether the legacy `get_greeks_safe` generated fallback gamma (broker gamma absent) and whether the selected ATM window represents the total listed option market. Until these issues are independently resolved, **label GEX as a partial-chain signed-OI scenario, not true dealer gamma exposure**. Zero-gamma flip is a model scenario, not observed dealer flow.
+
+Run read-only historical GEX audit in isolated AWS worktree:
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_option_timing_gex_assumptions.py
+$PY -m nifty_l2.gex_assumption_audit \
+  --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db \
+  --lot-size 65 \
+  --report ~/nifty-validation-reports/gex-assumptions.json
+```
+
+Keep the original historical DB, frozen nine-check code, and FYERS token unchanged. This audit does not certify GEX accuracy or authorize deployment.
