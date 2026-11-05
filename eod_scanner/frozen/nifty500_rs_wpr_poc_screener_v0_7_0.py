@@ -2695,7 +2695,8 @@ def run_self_test() -> None:
     assert compression_result["Strategy_Track"] == "TRACK_B_COMPRESSION_BREAKOUT"
     assert compression_result["Track_B_Price_EMA20_Required"] is False
     assert compression_result["Compression_Setup_Date"] == compression.index[-2].date().isoformat()
-    assert compression_result["Indicative_RR_TP1"] >= config.breakout_min_risk_reward    assert daily_prefilter(compression, config)
+    assert compression_result["Indicative_RR_TP1"] >= config.breakout_min_risk_reward
+    assert daily_prefilter(compression, config)
 
     extended = compression.copy()
     extended.loc[extended.index[-1], ["Open", "Low", "High", "Close"]] = [
