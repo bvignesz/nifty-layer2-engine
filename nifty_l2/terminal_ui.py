@@ -130,7 +130,7 @@ def history_html(data):
             escape(str(v)) + '</option>' for v in values)
 
     query = dict(date=data['day'], expiry=data['expiry'], strike=data['strike'])
-    export_url = '/export?' + urlencode(dict(query, page=data['page']))
+    export_url = '/export/terminal?' + urlencode(dict(query, page=data['page']))
     stamps = defaultdict(dict)
     for row in data['rows']:
         stamps[row[0]][row[1]] = row
@@ -251,3 +251,61 @@ def history_html(data):
                         escape(urlencode(dict(query, page=number)), quote=True) + '">' + label + '</a> ')
     html.append('</div></div><p class="snapshot-note">Calculated values are same-contract, consecutive observation differences, not exchange trade-side data. Writing, buying and seller-exit labels are descriptive OI/premium proxies only, not actual counterparty identification. No 1-minute bars or dealer notional GEX are reconstructed. Outside-session snapshots and gaps over 6 minutes have no change-based classification.</p></article>')
     return ''.join(html)
+
+def terminal_text(data):
+    """ASCII/TSV export of the same stored fields and descriptive delta proxies."""
+    stamps = defaultdict(dict)
+    for row in data['rows']:
+        stamps[row[0]][row[1]] = row
+    all_stamps = defaultdict(dict)
+    for row in data['rows'] + data.get('prior_rows', []):
+        all_stamps[row[0]][row[1]] = row
+    ordered = sorted(all_stamps)
+    cols = ['Observed IST', 'CE OI', 'PE OI', 'CE OI change', 'PE OI change',
+            'CE volume change', 'PE volume change', 'CE premium change', 'PE premium change',
+            'CE activity proxy', 'PE activity proxy', 'CE gamma', 'PE gamma',
+            'Futures', 'Futures price change', 'Futures OI change', 'Futures quadrant']
+    lines = ['PRO TRADER ACADEMY / NIFTY STORED STRIKE SNAPSHOTS',
+             f"Date: {data['day']} | Expiry: {data['expiry']} | Strike: {data['strike']}",
+             'Research-only observed snapshots, not completed 1-minute bars.',
+             'Activity categories are OI/premium proxies, not buyer/seller identification.',
+             '\\t'.join(cols)]
+    for stamp in sorted(stamps, reverse=True):
+        pair = stamps[stamp]
+        index = ordered.index(stamp)
+        before = ordered[index - 1] if index else None
+        valid = (before is not None and _valid_session(stamp) and _valid_session(before)
+                 and 0 < stamp - before <= 360 and
+                 datetime.fromtimestamp(before, IST).date() == datetime.fromtimestamp(stamp, IST).date())
+        prior = all_stamps.get(before, {}) if valid else {}
+        values = []
+        for side in ('CE', 'PE'):
+            row, old = pair.get(side), prior.get(side)
+            doi = _delta(row, old, 2) if valid else None
+            dvol = _delta(row, old, 3) if valid else None
+            if dvol is not None and dvol < 0:
+                dvol = None
+            dp = _delta(row, old, 4) if valid else None
+            values.append((row, doi, dvol, dp, _activity(doi, dp, dvol)))
+        c, p = values
+        cur = c[0] or p[0]
+        old = prior.get('CE') or prior.get('PE')
+        fp = _delta(cur, old, 8) if valid else None
+        fo = _delta(cur, old, 9) if valid and cur is not None and old is not None and cur[9] and old[9] else None
+        fmt = lambda n, places=0: _number(n, places)
+        lines.append('\\t'.join([
+            datetime.fromtimestamp(stamp, IST).strftime('%H:%M:%S') +
+                (' AFTERHOURS' if not _valid_session(stamp) else ''),
+            fmt(c[0][2]) if c[0] else '—',
+            fmt(p[0][2]) if p[0] else '—',
+            _signed(c[1]), _signed(p[1]), _signed(c[2]), _signed(p[2]),
+            _signed(c[3], 2), _signed(p[3], 2), c[4] or 'UNAVAILABLE',
+            p[4] or 'UNAVAILABLE',
+            fmt(c[0][7], 6) if c[0] else '—',
+            fmt(p[0][7], 6) if p[0] else '—',
+            fmt(cur[8], 2) if cur else '—', _signed(fp, 2), _signed(fo),
+            _futures_quad(fp, fo) if valid else 'NOT COMPARABLE',
+        ]))
+    if not stamps:
+        lines.append('No saved snapshots for selected filter.')
+    return '\\n'.join(lines) + '\\n'
