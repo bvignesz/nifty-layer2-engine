@@ -19,7 +19,7 @@ from . import fyers
 from .runner import Runner
 from .storage import IST
 from .terminal import CSS, snapshots, history_text
-from .terminal_ui import UI_CSS, history_html
+from .terminal_ui import UI_CSS, history_html, terminal_text
 import sqlite3
 
 
@@ -249,6 +249,14 @@ def handler_for(app):
             elif path == '/terminal.js':
                 self.respond(200, Path(__file__).with_name('terminal.js').read_text(encoding='utf-8'),
                              content_type='text/javascript; charset=utf-8')
+            elif path == '/export/terminal':
+                try:
+                    data = snapshots(app.runner.directory, parse_qs(urlparse(self.path).query))
+                    self.respond(200, terminal_text(data),
+                                 [('Content-Disposition', 'attachment; filename="nifty-terminal-snapshots.txt"')],
+                                 content_type='text/plain; charset=utf-8')
+                except (ValueError, OverflowError, IndexError):
+                    self.respond(400, 'Invalid terminal filter', content_type='text/plain; charset=utf-8')
             elif path == '/export':
                 try:
                     data = snapshots(app.runner.directory, parse_qs(urlparse(self.path).query))
