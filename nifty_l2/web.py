@@ -20,6 +20,8 @@ from .runner import Runner
 from .storage import IST
 from .terminal import CSS, snapshots, history_text
 from .terminal_ui import UI_CSS, history_html
+from .research_readmodel import research_history, expiry_matrix, readiness
+from .research_pages import render as render_research_page
 import sqlite3
 
 
@@ -201,7 +203,7 @@ class App:
         except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
             pass
         refresh = '<meta http-equiv="refresh" content="5;url=/">' if running else ''
-        return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">''' + refresh + '''<title>Pro Trader Academy · NIFTY Research Terminal</title><style>''' + CSS + UI_CSS + '''</style><script defer src="/terminal.js"></script><main><header><div class="brand"><span class="logo">PT</span><div><b>PRO TRADER ACADEMY</b><small>NIFTY · STRIKE OI &amp; GEX RESEARCH TERMINAL</small></div></div><span class="tag">STORED RESEARCH · 3 MIN COLLECTION</span></header><h1>NIFTY market structure</h1><p>Option snapshots · nine-check engine · database history.</p>''' + (
+        return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">''' + refresh + '''<title>Pro Trader Academy · NIFTY Research Terminal</title><style>''' + CSS + UI_CSS + '''</style><script defer src="/terminal.js"></script><main><header><div class="brand"><span class="logo">PT</span><div><b>PRO TRADER ACADEMY</b><small>NIFTY · STRIKE OI &amp; GEX RESEARCH TERMINAL</small></div></div><span class="tag">STORED RESEARCH · 3 MIN COLLECTION</span></header><nav class="research-nav"><a href="/research">Nine-check history</a> · <a href="/expiries">Multi-expiry</a> · <a href="/eod">EOD scanner</a> · <a href="/validation">Validation</a></nav><h1>NIFTY market structure</h1><p>Option snapshots · nine-check engine · database history.</p>''' + (
             f'<div class="notice" role="status">{escape(message)}</div>' if message else '') + history + f'''
 <div class="grid"><article><h2>1 / Connect FYERS</h2><p>{'FYERS login saved · checked on every run' if saved else 'Not connected'}</p>''' + form('/connect', 'Connect FYERS') + (form('/quote', 'Verify & fetch quote') if saved else '') + manual + '''<p class="muted">Your account login and OTP stay on FYERS.</p></article><article><h2>2 / Run your script</h2><p>''' + escape(status.get('status', 'IDLE')) + '</p><p class="muted">' + escape(status.get('message', '')) + '</p>' + (form('/run/stop', 'Stop run') if running else form('/run', 'Run script once')) + '''<p class="muted">Manual run of the nine-check engine. Automatic collection runs separately during market hours. Refreshes every 5 seconds while a run is active.</p></article></div><article><h2>Research summary · latest completed run</h2>''' + result_html + '''<p><a href="/">Refresh status</a></p></article>''' + automation + '''<article><details><summary>FYERS app settings</summary><p>Register this exact redirect URL in your FYERS app:</p><code>''' + escape(self.callback) + '''</code><p class="muted">''' + ('App credentials are configured. Saving new credentials disconnects the previous account.' if self.client_id and self.secret else 'Enter fresh app credentials below. They are saved privately on the server.') + '''</p><form method="post" action="/settings">''' + csrf + '''<label for="client_id">FYERS App ID</label><input id="client_id" name="client_id" required maxlength="128" autocomplete="off"><label for="secret">FYERS App Secret</label><input id="secret" name="secret" type="password" required maxlength="512" autocomplete="new-password"><button>Save app settings''' + (' &amp; connect FYERS' if self.origin.startswith('https:') else '') + '''</button></form></details></article><footer>Pro Trader Academy · Research only · No order placement · Stored observations and model estimates; live signal validation remains pending.</footer></main></html>'''
 
@@ -236,7 +238,27 @@ def handler_for(app):
             if not self.authorized():
                 return
             path = urlparse(self.path).path
-            if path == '/':
+            if path in ('/research','/expiries','/eod','/validation'):
+                try:
+                    self.respond(200, render_research_page(app.runner.directory, path.lstrip('/'), parse_qs(urlparse(self.path).query)))
+                except (ValueError, OverflowError, sqlite3.Error):
+                    self.respond(400, 'Invalid research filter', content_type='text/plain; charset=utf-8')
+            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness'):
+                try:
+                    q = parse_qs(urlparse(self.path).query)
+                    day = q.get('date', [datetime.now(IST).date().isoformat()])[0]
+                    if path == '/api/v1/research':
+                        payload = research_history(app.runner.directory, day, q.get('limit', ['40'])[0])
+                    elif path == '/api/v1/expiries':
+                        payload = expiry_matrix(app.runner.directory, day, q.get('strike', ['24450'])[0])
+                    else:
+                        payload = readiness(app.runner.directory)
+                    self.respond(200, json.dumps(payload, ensure_ascii=False, allow_nan=False),
+                                 content_type='application/json; charset=utf-8')
+                except (ValueError, OverflowError, sqlite3.Error):
+                    self.respond(400, json.dumps({'error':'Invalid research filter'}),
+                                 content_type='application/json; charset=utf-8')
+            elif path == '/':
                 status = parse_qs(urlparse(self.path).query).get('connection', [''])[0]
                 message = {'verified': 'FYERS authentication verified. Fetch a quote to check data access.',
                            'missing-state': 'FYERS returned without a login state. Use Connect FYERS to start login; do not open the callback URL directly.',
