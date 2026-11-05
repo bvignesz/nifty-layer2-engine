@@ -5,6 +5,7 @@ Until an authoritative per-option-OI exchange update time is available,
 never promote option observations into verified 1m/3m candles.
 """
 from datetime import datetime, timezone
+from .market_calendar import IST, session
 from math import isfinite
 
 def _dt(value):
@@ -48,8 +49,14 @@ def comparable_pair(previous,current,*,max_receipt_gap_seconds=360,
         return {"status":"BLOCKED","reason":"Receipt gap, overlap or ordering failure"}
     if max(a["request_duration_seconds"],b["request_duration_seconds"])>max_request_seconds:
         return {"status":"BLOCKED","reason":"Request latency exceeds guard"}
-    if left.date()!=right.date():
+    if left.astimezone(IST).date()!=right.astimezone(IST).date():
         return {"status":"BLOCKED","reason":"Cross-day comparison"}
+    try:
+        hours=session(right.astimezone(IST).date())
+    except ValueError:
+        return {"status":"BLOCKED","reason":"Trading calendar unverified"}
+    if hours is None or not (hours[0] <= left.astimezone(IST) <= right.astimezone(IST) <= hours[1]):
+        return {"status":"BLOCKED","reason":"Outside verified F&O session"}
     previous_legs=previous.get("legs",{})
     current_legs=current.get("legs",{})
     if not previous_legs or not current_legs:
