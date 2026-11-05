@@ -94,3 +94,43 @@ $PY -m nifty_l2.futures_copy_backfill \\
 ```
 
 This second command creates a new private SQLite copy and refuses overwrites. It does NOT install, merge, restart web/collector or mutate production. Neither backfill nor futures provenance can retroactively supply a valid option-chain exchange timestamp. The six historical collection gaps remain visible and are excluded from comparable three-minute change calculations. Existing market-quality gates remain blocked until trustworthy exchange-time evidence is available.
+
+
+## Next diagnostic stage: option-chain time provenance and live futures OI
+
+The original AWS SQLite audit showed 111 research events, all without event-level verified exchange time. The first futures recovery copy retained 104/111 eligible completed futures observations; seven manual observations were after NSE session, so the after-hours rejections must **not** be bypassed.
+
+Two additional **read-only tools** were added:
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_market_provenance.py
+```
+
+**1) Audit option time-field provenance without modifying the production DB:**
+
+```bash
+$PY -m nifty_l2.option_time_audit \
+  --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db \
+  --report ~/nifty-validation-reports/option-time-audit.json
+```
+
+This counts only candidate timestamp keys in recorded FYERS option-chain **legs**, checks parseability and plausibility, and explicitly leaves `exchange_timestamp_verified=false`. A broker response may carry a last-trade time without providing an exchange-level OI snapshot time. Neither the candidate key name nor a plausible epoch is sufficient to claim option-chain freshness.
+
+**2) Probe real FYERS 3-minute historical futures OI.**
+
+The archived calls consistently used `NSE:NIFTY26NOVFUT`, but validate that this is still the relevant active contract when running the command. This test uses a saved private token, makes one read-only FYERS history request, and does **not** place orders:
+
+```bash
+$PY -m nifty_l2.futures_oi_probe --live \
+  --token-path /home/ubuntu/.config/nifty-layer2/fyers-token.json \
+  --future-symbol NSE:NIFTY26NOVFUT \
+  --report ~/nifty-validation-reports/futures-oi-live.json
+```
+
+The futures test detects missing/zero OI, duplicate timestamps, unfinished candles, invalid OHLCV and same-day interval discontinuities. A passing futures response still does **not** validate option-chain timestamps or establish that gamma dealer inventory is observable.
+
+**Deployment remains blocked** until the separate EOD parity, Greeks/OI units, outcome and browser/security evidence gates are satisfied. Do not mark these audit files `verified=true` without independent evidence. All production collector and legacy nine-check calculations remain unchanged.
