@@ -17,7 +17,7 @@ nifty-l2 = "nifty_l2.cli:main"
 nifty-l2-web = "nifty_l2.web:main"
 
 [tool.setuptools.packages.find]
-include = ["nifty_l2*"]
+include = ["nifty_l2*", "eod_scanner*"]
 
 [tool.setuptools.package-data]
 nifty_l2 = ["schema.sql"]
