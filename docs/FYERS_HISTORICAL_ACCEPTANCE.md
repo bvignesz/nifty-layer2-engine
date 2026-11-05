@@ -211,3 +211,9 @@ $PY -m nifty_l2.gex_assumption_audit \
 ```
 
 Keep the original historical DB, frozen nine-check code, and FYERS token unchanged. This audit does not certify GEX accuracy or authorize deployment.
+
+### Clarification from original source audit
+
+The legacy `net_gex_cr` formula does **not** multiply by `NIFTY_LOT_SIZE`; it treats the incoming `oi` number as underlying-equivalent quantity. The frozen default `75` affects other contract-quantity calculations and must be checked, but **merely changing the lot environment variable to 65 does not itself correct GEX**. `compute_swept_gamma_flip_scenario(..., lot_size)` accepts a lot-size argument yet currently computes its grid directly from raw OI without using that argument. Accordingly the critical GEX issue is determining what units FYERS `oi` represents and validating input gamma and contract identity.
+
+`get_greeks_safe` substitutes a Black-style modeled gamma if broker gamma OR delta is zero. A broker-gamma-only audit cannot certify that every *legacy* output used broker gamma. Before publishing modeled dealer hedging, separately compare raw vs transformed Greeks and instrument multiplier; price-based gamma reprojection requires a validated time-to-expiry, dividend/rate convention, and specified price underlying.
