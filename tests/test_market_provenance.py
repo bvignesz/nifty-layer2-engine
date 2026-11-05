@@ -91,3 +91,23 @@ def test_session_exclusions_keep_local_samples_and_1540_fo_close():
     assert summary["after_session_rows"]==1
     assert summary["after_session_samples_ist"]==[
         (at+timedelta(minutes=6)).isoformat()]
+
+def test_duplicate_conflict_field_breakdown():
+    at=datetime.fromisoformat("2026-11-05T09:15:00+05:30")
+    bars=[_candle(at+timedelta(minutes=3*i)) for i in range(6)]
+    oi_changed=bars[0].copy()
+    oi_changed[6]=2500
+    volume_changed=bars[1].copy()
+    volume_changed[5]=1200
+    close_changed=bars[2].copy()
+    close_changed[4]=101
+    result=summarize_futures({"s":"ok","candles":[*bars,oi_changed,volume_changed,close_changed]},
+                             asof=at+timedelta(minutes=30))
+    assert result["status"]=="FUTURES_HISTORY_CONFLICTS_REVIEW_REQUIRED"
+    assert result["conflicting_duplicate_rows"]==3
+    assert result["conflicts_oi"]==1
+    assert result["conflicts_volume"]==1
+    assert result["conflicts_price_ohlc"]==1
+    assert result["conflicts_only_oi"]==1
+    assert result["conflicts_only_volume"]==1
+    assert len(result["conflict_examples"])==3
