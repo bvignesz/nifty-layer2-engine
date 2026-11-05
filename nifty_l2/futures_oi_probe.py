@@ -23,6 +23,9 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
               "unfinished_rows":0,"after_session_rows":0,"non_3min_spacing":0,
               "duplicate_timestamps":0,"identical_duplicate_rows":0,
               "conflicting_duplicate_rows":0,"missing_oi_unique_bars":0,
+              "conflicts_price_ohlc":0,"conflicts_volume":0,"conflicts_oi":0,
+              "conflicts_only_oi":0,"conflicts_only_volume":0,
+              "conflict_examples":[],
               "after_session_samples_ist":[],"conflict_samples_ist":[],
               "latest_bar_start_utc":None,
               "oldest_bar_start_utc":None,"option_exchange_time_verified":False,
@@ -77,6 +80,24 @@ def summarize_futures(response, *, asof, resolution_minutes=3):
                 identical_duplicates+=1
             else:
                 conflicting_duplicates+=1
+                baseline=valid[start]
+                price_different=baseline[:4]!=signature[:4]
+                volume_different=baseline[4]!=signature[4]
+                oi_different=baseline[5]!=signature[5]
+                result["conflicts_price_ohlc"]+=bool(price_different)
+                result["conflicts_volume"]+=bool(volume_different)
+                result["conflicts_oi"]+=bool(oi_different)
+                result["conflicts_only_oi"]+=bool(oi_different and not price_different and not volume_different)
+                result["conflicts_only_volume"]+=bool(volume_different and not price_different and not oi_different)
+                if len(result["conflict_examples"]) < 8:
+                    # Only brief numeric deltas and a timestamp; no full broker data dump.
+                    result["conflict_examples"].append({
+                        "bar_start_ist":start_local.isoformat(),
+                        "ohlc_changed":price_different,
+                        "volume_changed":volume_different,
+                        "oi_changed":oi_different,
+                        "oi_first":baseline[5], "oi_other":signature[5],
+                        "volume_first":baseline[4],"volume_other":signature[4]})
                 if len(result["conflict_samples_ist"]) < 12:
                     result["conflict_samples_ist"].append(start_local.isoformat())
         else:
