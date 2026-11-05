@@ -63,8 +63,14 @@ def _mock_api(op,*,params=None,credentials=None):
             {"option_type":"PE","strike_price":24500,"symbol":"NSE:PE",
              "oi":20000,"ltp":110,"greeks":{"gamma":.00012}}]}}
     if op=="history":
-        start=int(datetime.fromisoformat("2026-11-04T10:00:00+05:30").timestamp())
-        return {"s":"ok","candles":[[start,100,105,98,102,40000,12345]]}
+        if params["resolution"]=="D":
+            times=[int(datetime.fromisoformat(f"2026-11-0{d}T09:15:00+05:30").timestamp())
+                   for d in (2,3,4)]
+        else:
+            start=int(datetime.fromisoformat("2026-11-04T10:00:00+05:30").timestamp())
+            step=180 if params["resolution"]=="3" else 900
+            times=[start+i*step for i in range(6)]
+        return {"s":"ok","candles":[[ts,100,105,98,102,40000,12345] for ts in times]}
     raise AssertionError("Unapproved API operation attempted: "+op)
 
 
