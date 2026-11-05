@@ -28,7 +28,7 @@ def test_ui_uses_existing_snapshot_values_without_fabricating_gex(tmp_path):
     assert "CE 0.000012 / PE 0.000014" in html
     assert "Notional GEX: unavailable" in html
     assert "no seller identification" in html
-    assert "AFTER-HOURS · NOT COMPARABLE" in html
+    assert "IN-SESSION OBSERVATION" in html
     assert "/export?" in html and "copy-snapshots" in html
 
 
