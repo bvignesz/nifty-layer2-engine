@@ -18,7 +18,8 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from . import fyers
 from .runner import Runner
 from .storage import IST
-from .terminal import CSS, snapshots, history_html, history_text
+from .terminal import CSS, snapshots, history_text
+from .terminal_ui import UI_CSS, history_html
 import sqlite3
 
 
@@ -200,7 +201,7 @@ class App:
         except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
             pass
         refresh = '<meta http-equiv="refresh" content="5;url=/">' if running else ''
-        return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">''' + refresh + '''<title>Pro Trader Academy · NIFTY Research Terminal</title><style>''' + CSS + '''</style><main><header><div class="brand"><span class="logo">PT</span><div><b>PRO TRADER ACADEMY</b><small>NIFTY · STRIKE OI &amp; GEX RESEARCH TERMINAL</small></div></div><span class="tag">STORED RESEARCH · 3 MIN COLLECTION</span></header><h1>NIFTY market structure</h1><p>Option snapshots · nine-check engine · database history.</p>''' + (
+        return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">''' + refresh + '''<title>Pro Trader Academy · NIFTY Research Terminal</title><style>''' + CSS + UI_CSS + '''</style><script defer src="/terminal.js"></script><main><header><div class="brand"><span class="logo">PT</span><div><b>PRO TRADER ACADEMY</b><small>NIFTY · STRIKE OI &amp; GEX RESEARCH TERMINAL</small></div></div><span class="tag">STORED RESEARCH · 3 MIN COLLECTION</span></header><h1>NIFTY market structure</h1><p>Option snapshots · nine-check engine · database history.</p>''' + (
             f'<div class="notice" role="status">{escape(message)}</div>' if message else '') + history + f'''
 <div class="grid"><article><h2>1 / Connect FYERS</h2><p>{'FYERS login saved · checked on every run' if saved else 'Not connected'}</p>''' + form('/connect', 'Connect FYERS') + (form('/quote', 'Verify & fetch quote') if saved else '') + manual + '''<p class="muted">Your account login and OTP stay on FYERS.</p></article><article><h2>2 / Run your script</h2><p>''' + escape(status.get('status', 'IDLE')) + '</p><p class="muted">' + escape(status.get('message', '')) + '</p>' + (form('/run/stop', 'Stop run') if running else form('/run', 'Run script once')) + '''<p class="muted">Manual run of the nine-check engine. Automatic collection runs separately during market hours. Refreshes every 5 seconds while a run is active.</p></article></div><article><h2>Research summary · latest completed run</h2>''' + result_html + '''<p><a href="/">Refresh status</a></p></article>''' + automation + '''<article><details><summary>FYERS app settings</summary><p>Register this exact redirect URL in your FYERS app:</p><code>''' + escape(self.callback) + '''</code><p class="muted">''' + ('App credentials are configured. Saving new credentials disconnects the previous account.' if self.client_id and self.secret else 'Enter fresh app credentials below. They are saved privately on the server.') + '''</p><form method="post" action="/settings">''' + csrf + '''<label for="client_id">FYERS App ID</label><input id="client_id" name="client_id" required maxlength="128" autocomplete="off"><label for="secret">FYERS App Secret</label><input id="secret" name="secret" type="password" required maxlength="512" autocomplete="new-password"><button>Save app settings''' + (' &amp; connect FYERS' if self.origin.startswith('https:') else '') + '''</button></form></details></article><footer>Pro Trader Academy · Research only · No order placement · Stored observations and model estimates; live signal validation remains pending.</footer></main></html>'''
 
@@ -216,7 +217,7 @@ def handler_for(app):
             self.send_response(code)
             for key, value in [('Content-Type', content_type), ('Cache-Control', 'no-store'),
                                ('Referrer-Policy', 'same-origin'), ('X-Content-Type-Options', 'nosniff'),
-                               ('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https://api-t1.fyers.in; frame-ancestors 'none'; base-uri 'none'"), *headers]:
+                               ('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action 'self' https://api-t1.fyers.in; frame-ancestors 'none'; base-uri 'none'"), *headers]:
                 self.send_header(key, value)
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
@@ -245,6 +246,9 @@ def handler_for(app):
                            'api-failed': 'FYERS could not complete token exchange or account verification. Check the App ID and App Secret, enable Profile permission in your FYERS app, then connect again.',
                            'failed': 'Login failed or expired. Start a fresh connection in this same browser. Ensure the registered FYERS callback is ' + app.callback}.get(status, '')
                 self.respond(200, app.page(message, parse_qs(urlparse(self.path).query)))
+            elif path == '/terminal.js':
+                self.respond(200, Path(__file__).with_name('terminal.js').read_text(encoding='utf-8'),
+                             content_type='text/javascript; charset=utf-8')
             elif path == '/export':
                 try:
                     data = snapshots(app.runner.directory, parse_qs(urlparse(self.path).query))
