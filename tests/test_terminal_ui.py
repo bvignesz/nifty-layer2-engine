@@ -26,9 +26,9 @@ def test_ui_uses_existing_snapshot_values_without_fabricating_gex(tmp_path):
     assert "+500" in html
     assert "23,980.50" in html
     assert "CE 0.000012 / PE 0.000014" in html
-    assert "Net GEX / 1M Δ unavailable" in html
-    assert "No seller-only attribution" in html
-    assert "OBSERVED · NOT 1M CANDLE" in html
+    assert "Notional GEX: unavailable" in html
+    assert "no seller identification" in html
+    assert "IN-SESSION OBSERVATION" in html
     assert "/export?" in html and "copy-snapshots" in html
 
 
