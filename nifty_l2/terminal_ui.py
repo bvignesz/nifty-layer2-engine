@@ -70,50 +70,98 @@ def _td(main, sub='', cls=''):
         '<div class="mono-sub">' + escape(str(sub)) + '</div>' if sub else '') + '</td>'
 
 
+
+def _valid_session(stamp):
+    from datetime import time
+    local = datetime.fromtimestamp(stamp, IST)
+    return time(9, 15) <= local.time() <= time(15, 40)
+
+
+def _delta(current, previous, index):
+    if current is None or previous is None:
+        return None
+    try:
+        a, b = float(current[index]), float(previous[index])
+        import math
+        return a - b if math.isfinite(a) and math.isfinite(b) else None
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def _signed(value, places=0):
+    return ('+' if value > 0 else '') + _number(value, places) if value is not None else '—'
+
+
+def _activity(doi, dprice, dvolume):
+    """A descriptive OI/price proxy; never buyer/seller trade identification."""
+    if doi is None or dprice is None or dvolume is None or dvolume < 0:
+        return None
+    if doi > 0 and dprice < 0:
+        return 'WRITING-LIKE'
+    if doi > 0 and dprice > 0:
+        return 'LONG-ADDITION-LIKE'
+    if doi < 0 and dprice > 0:
+        return 'SHORT-COVERING-LIKE'
+    if doi < 0 and dprice < 0:
+        return 'LONG-UNWINDING-LIKE'
+    return 'UNCONFIRMED'
+
+
+def _futures_quad(dp, doi):
+    if dp is None or doi is None:
+        return 'OI unavailable'
+    if dp > 0 and doi > 0:
+        return 'LONG BUILDUP · proxy'
+    if dp < 0 and doi > 0:
+        return 'SHORT BUILDUP · proxy'
+    if dp > 0 and doi < 0:
+        return 'SHORT COVERING · proxy'
+    if dp < 0 and doi < 0:
+        return 'LONG UNWINDING · proxy'
+    return 'FLAT / UNCONFIRMED'
+
+
 def history_html(data):
-    """Render stored strike snapshots without claiming one-minute or GEX data."""
+    """Populate observed market quantities and time-aligned descriptive proxies."""
     def options(values, selected):
         return '<option value="">Select</option>' + ''.join(
             '<option value="' + escape(str(v), quote=True) + '"' +
             (' selected' if str(v) == str(selected) else '') + '>' +
-            escape(str(v)) + '</option>' for v in values
-        )
+            escape(str(v)) + '</option>' for v in values)
 
     query = dict(date=data['day'], expiry=data['expiry'], strike=data['strike'])
     export_url = '/export?' + urlencode(dict(query, page=data['page']))
     stamps = defaultdict(dict)
     for row in data['rows']:
         stamps[row[0]][row[1]] = row
-
-    # These are OI quantities, not gamma exposure or dealer-side attribution.
-    ce = sum(int(pair['CE'][2]) for pair in stamps.values()
-             if 'CE' in pair and pair['CE'][2] is not None)
-    pe = sum(int(pair['PE'][2]) for pair in stamps.values()
-             if 'PE' in pair and pair['PE'][2] is not None)
-    # Do not aggregate across time: show the latest stored contract OI only.
-    latest = stamps[max(stamps)] if stamps else {}
+    all_stamps = defaultdict(dict)
+    for row in data['rows'] + data.get('prior_rows', []):
+        all_stamps[row[0]][row[1]] = row
+    sorted_times = sorted(all_stamps)
+    previous_time = {stamp: sorted_times[i - 1] if i else None for i, stamp in enumerate(sorted_times)}
+    regular = [t for t in stamps if _valid_session(t)]
+    latest_ts = max(regular) if regular else None
+    latest = stamps[latest_ts] if latest_ts is not None else {}
     latest_ce = latest.get('CE', [None, None, None])[2]
     latest_pe = latest.get('PE', [None, None, None])[2]
-    balance = (float(latest_pe) - float(latest_ce)) if latest_pe is not None and latest_ce is not None else None
-    last_seen = datetime.fromtimestamp(max(stamps), IST).strftime('%d %b %Y %H:%M:%S IST') if stamps else 'No saved observations'
-
+    balance = float(latest_pe) - float(latest_ce) if latest_ce is not None and latest_pe is not None else None
+    last_seen = datetime.fromtimestamp(latest_ts, IST).strftime('%d %b %Y %H:%M:%S IST') if latest_ts else 'No regular-session observations'
     html = [
         '<article class="snapshot-shell" id="strike-terminal">',
         '<div class="snapshot-top"><div><div class="snapshot-title">PRO TRADER ACADEMY · NIFTY STRIKE OI TERMINAL</div>',
         '<div class="snapshot-sub">Expiry ' + escape(data['expiry'] or '—') +
         ' · Strike ' + escape(data['strike'] or '—') +
-        ' · Last observed ' + escape(last_seen) + '</div></div>',
-        '<div class="snapshot-pills"><span class="snapshot-pill disabled" title="No 1-minute saved snapshots">1 MIN · UNAVAILABLE</span>',
-        '<span class="snapshot-pill active">3 MIN · SAMPLED</span>',
-        '<span class="snapshot-pill">STORED RESEARCH</span></div></div>',
+        ' · Latest session observation ' + escape(last_seen) + '</div></div>',
+        '<div class="snapshot-pills"><span class="snapshot-pill disabled">1 MIN · NOT COLLECTED</span>',
+        '<span class="snapshot-pill active">3 MIN · OBSERVATIONS</span>',
+        '<span class="snapshot-pill">OI / PREMIUM PROXIES · NOT TRADE SIGNALS</span></div></div>',
         '<div class="snapshot-cards">',
-        '<div class="snapshot-card ce"><small>CE open interest · latest</small><strong>' + _number(latest_ce) +
-        '</strong><p>Saved CE OI, not CE GEX</p></div>',
-        '<div class="snapshot-card pe"><small>PE open interest · latest</small><strong>' + _number(latest_pe) +
-        '</strong><p>Saved PE OI, not PE GEX</p></div>',
-        '<div class="snapshot-card neutral"><small>PE − CE open interest · latest</small><strong>' +
-        (('+' if balance >= 0 else '') + _number(balance) if balance is not None else '—') +
-        '</strong><p>OI difference only · GEX valuation unavailable</p></div></div>',
+        '<div class="snapshot-card ce"><small>CE open interest · latest in-session</small><strong>' + _number(latest_ce) +
+        '</strong><p>Observed CE OI · not CE GEX</p></div>',
+        '<div class="snapshot-card pe"><small>PE open interest · latest in-session</small><strong>' + _number(latest_pe) +
+        '</strong><p>Observed PE OI · not PE GEX</p></div>',
+        '<div class="snapshot-card neutral"><small>PE − CE OI · latest in-session</small><strong>' +
+        _signed(balance) + '</strong><p>Same-strike difference only, not net GEX</p></div></div>',
         '<div class="snapshot-toolbar"><form class="filters" action="/" method="get">',
         '<label>SESSION DATE · IST<input type="date" name="date" value="' + escape(data['day'], quote=True) + '" required></label>',
         '<label>EXPIRY<select name="expiry">' + options(data['expiries'], data['expiry']) + '</select></label>',
@@ -124,48 +172,82 @@ def history_html(data):
         '" id="copy-snapshots">📋 Copy Table as Text</button> <a class="button" href="' +
         escape(export_url, quote=True) + '">Export TXT</a> <span id="copy-status" role="status"></span></div></div>',
         '<div class="snapshot-table" role="region" aria-label="Stored option snapshots" tabindex="0"><table>',
-        '<thead><tr><th>Observed snapshot<br>IST</th><th>OI wall context<br>CE / PE</th>',
-        '<th>Strike gamma<br>Stored, not GEX</th><th>Seller only<br>Neutralization</th>',
-        '<th>PE writing</th><th>CE writing</th><th>PE buying</th><th>CE buying</th>',
-        '<th>PE seller exit</th><th>CE seller exit</th><th>Futures read</th></tr></thead><tbody>',
+        '<thead><tr><th>Observed<br>IST</th><th>Strike OI<br>CE / PE Δ</th>',
+        '<th>Stored gamma<br>not GEX</th><th>OI neutralization<br>writing-like proxy</th>',
+        '<th>PE writing<br>proxy</th><th>CE writing<br>proxy</th>',
+        '<th>PE buying<br>proxy</th><th>CE buying<br>proxy</th>',
+        '<th>PE seller exit<br>proxy</th><th>CE seller exit<br>proxy</th>',
+        '<th>Futures<br>price &amp; OI</th></tr></thead><tbody>'
     ]
     for stamp in sorted(stamps, reverse=True):
         pair = stamps[stamp]
         c, p = pair.get('CE'), pair.get('PE')
+        before = previous_time.get(stamp)
+        valid = (before is not None and _valid_session(stamp) and _valid_session(before)
+                 and 0 < stamp - before <= 360
+                 and datetime.fromtimestamp(before, IST).date() == datetime.fromtimestamp(stamp, IST).date())
+        prior = all_stamps.get(before, {}) if valid else {}
+        data_by_side = {}
+        for side, row in [('CE', c), ('PE', p)]:
+            old = prior.get(side)
+            oi_diff = _delta(row, old, 2) if valid else None
+            vol_diff = _delta(row, old, 3) if valid else None
+            premium_diff = _delta(row, old, 4) if valid else None
+            if vol_diff is not None and vol_diff < 0:  # reject session resets and revised counters
+                vol_diff = None
+            signal = _activity(oi_diff, premium_diff, vol_diff)
+            data_by_side[side] = (row, oi_diff, vol_diff, premium_diff, signal)
+        _, cd, cv, cp, ca = data_by_side['CE']
+        _, pd, pv, pp, pa = data_by_side['PE']
+
         def field(row, idx, places=0):
             return _number(row[idx], places) if row is not None else '—'
+
         ce_oi, pe_oi = field(c, 2), field(p, 2)
-        ce_vol, pe_vol = field(c, 3), field(p, 3)
-        # The gamma column is per-contract stored Greek; no GEX notional is derived.
-        gamma = 'CE ' + field(c, 7, 6) + ' / PE ' + field(p, 7, 6)
-        fut = c[8] if c is not None else p[8] if p is not None else None
+        ce_gamma, pe_gamma = field(c, 7, 6), field(p, 7, 6)
+        lead = None
+        if cd is not None and pd is not None:
+            lead = pd - cd
+        classification = 'PE writing-like' if pa == 'WRITING-LIKE' else 'CE writing-like' if ca == 'WRITING-LIKE' else 'No writing-like flow'
+        if pa == 'WRITING-LIKE' and ca == 'WRITING-LIKE':
+            classification = 'Both sides writing-like'
+        futrow = c if c is not None else p
+        oldfut = prior.get('CE') or prior.get('PE')
+        fp = _delta(futrow, oldfut, 8) if valid else None
+        fo = _delta(futrow, oldfut, 9) if valid and futrow is not None and oldfut is not None and futrow[9] and oldfut[9] else None
+        futdesc = _futures_quad(fp, fo) if valid else 'Outside comparable session window'
+        fmt = lambda side, expected: (
+            (_signed(data_by_side[side][1]) + ' OI | Δvol ' + _signed(data_by_side[side][2]))
+            if data_by_side[side][4] == expected else '—'
+        )
+        stamp_label = datetime.fromtimestamp(stamp, IST).strftime('%H:%M:%S')
         html.append('<tr>')
-        html.append(_td(datetime.fromtimestamp(stamp, IST).strftime('%H:%M:%S'),
-                        'OBSERVED · NOT 1M CANDLE'))
+        html.append(_td(stamp_label, 'IN-SESSION OBSERVATION' if _valid_session(stamp) else 'AFTER-HOURS · NOT COMPARABLE'))
         html.append(_td('CE ' + ce_oi + ' | PE ' + pe_oi,
-                        'Stored OI, not proven wall strength'))
-        html.append(_td(gamma, 'Net GEX / 1M Δ unavailable'))
-        html.append(_td('Unavailable', 'No seller-only attribution', 'unknown'))
-        html.append(_td('Unavailable', 'PE cumulative volume ' + pe_vol, 'unknown'))
-        html.append(_td('Unavailable', 'CE cumulative volume ' + ce_vol, 'unknown'))
-        html.append(_td('Unavailable', 'Cannot infer buyer from volume', 'unknown'))
-        html.append(_td('Unavailable', 'Cannot infer buyer from volume', 'unknown'))
-        html.append(_td('Unavailable', 'No seller-exit classification', 'unknown'))
-        html.append(_td('Unavailable', 'No seller-exit classification', 'unknown'))
-        html.append(_td('Futures ' + _number(fut, 2),
-                        'Build / OI Δ / volume rank unavailable'))
+                        'CE Δ ' + _signed(cd) + ' | PE Δ ' + _signed(pd) +
+                        (' | PE−CE Δ ' + _signed(lead) if lead is not None else '')))
+        html.append(_td('CE ' + ce_gamma + ' / PE ' + pe_gamma,
+                        'Notional GEX: unavailable · no new valuation'))
+        html.append(_td(classification if valid else 'Not comparable',
+                        'PE Δ ' + _signed(pd) + ' | CE Δ ' + _signed(cd) + ' · no seller identification'))
+        html.append(_td(fmt('PE', 'WRITING-LIKE'), 'Premium Δ ' + _signed(pp, 2) + ' | model proxy'))
+        html.append(_td(fmt('CE', 'WRITING-LIKE'), 'Premium Δ ' + _signed(cp, 2) + ' | model proxy'))
+        html.append(_td(fmt('PE', 'LONG-ADDITION-LIKE'), 'Premium Δ ' + _signed(pp, 2) + ' | model proxy'))
+        html.append(_td(fmt('CE', 'LONG-ADDITION-LIKE'), 'Premium Δ ' + _signed(cp, 2) + ' | model proxy'))
+        html.append(_td(fmt('PE', 'SHORT-COVERING-LIKE'), 'Premium Δ ' + _signed(pp, 2) + ' | model proxy'))
+        html.append(_td(fmt('CE', 'SHORT-COVERING-LIKE'), 'Premium Δ ' + _signed(cp, 2) + ' | model proxy'))
+        html.append(_td('Fut ' + field(futrow, 8, 2),
+                        'Δprice ' + _signed(fp, 2) + ' | ΔOI ' + _signed(fo) + ' | ' + futdesc))
         html.append('</tr>')
     if not stamps:
         html.append('<tr><td colspan="11">' +
-                    escape(data['error'] or 'No snapshots for this selection. Choose a date, expiry and strike.') + '</td></tr>')
-    html.extend([
-        '</tbody></table></div>',
+                    escape(data['error'] or 'No snapshots for this date, expiry and strike.') + '</td></tr>')
+    html.extend(['</tbody></table></div>',
         '<div class="snapshot-foot"><small>' + str(data['total']) +
-        ' saved timestamps · page ' + str(data['page'] + 1) + '</small><div>',
-    ])
+        ' saved timestamps · page ' + str(data['page'] + 1) + '</small><div>'])
     for label, number in [('« Newer', data['page'] - 1), ('Older »', data['page'] + 1)]:
         if number >= 0 and (number < data['page'] or number * 12 < data['total']):
             html.append('<a class="button" href="/?' +
                         escape(urlencode(dict(query, page=number)), quote=True) + '">' + label + '</a> ')
-    html.append('</div></div><p class="snapshot-note">Observed snapshots are sampled about every three minutes, not completed one-minute candles. OI and volume are stored market fields; buyer/seller attribution, seller exits and notional GEX require additional verified modeling. No synthetic numbers or trading recommendations are shown.</p></article>')
+    html.append('</div></div><p class="snapshot-note">Calculated values are same-contract, consecutive observation differences, not exchange trade-side data. Writing, buying and seller-exit labels are descriptive OI/premium proxies only, not actual counterparty identification. No 1-minute bars or dealer notional GEX are reconstructed. Outside-session snapshots and gaps over 6 minutes have no change-based classification.</p></article>')
     return ''.join(html)
