@@ -58,7 +58,6 @@ def expiry_matrix(directory,day,strike):
     _,_,a,b=_day(day)
     result={"version":1,"day_ist":day,"strike":strike,"status":"NO_DATA",
             "rows":[],"note":"Only actual saved expiries are shown; unavailable ones are omitted."}
-    conn=_db(directory)
     from .expiry_archive import read_archive
     archive_rows=read_archive(directory,day,strike)
     if archive_rows:
@@ -66,6 +65,7 @@ def expiry_matrix(directory,day,strike):
         result["status"]="AVAILABLE"
         result["source"]="separate_multi_expiry_archive"
         return result
+    conn=_db(directory)
     if conn is None:return result
     try:
         rows=conn.execute("""SELECT h.expiry_date,s.opt_type,s.ts,s.symbol,
