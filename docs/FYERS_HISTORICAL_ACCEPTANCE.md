@@ -217,3 +217,33 @@ Keep the original historical DB, frozen nine-check code, and FYERS token unchang
 The legacy `net_gex_cr` formula does **not** multiply by `NIFTY_LOT_SIZE`; it treats the incoming `oi` number as underlying-equivalent quantity. The frozen default `75` affects other contract-quantity calculations and must be checked, but **merely changing the lot environment variable to 65 does not itself correct GEX**. `compute_swept_gamma_flip_scenario(..., lot_size)` accepts a lot-size argument yet currently computes its grid directly from raw OI without using that argument. Accordingly the critical GEX issue is determining what units FYERS `oi` represents and validating input gamma and contract identity.
 
 `get_greeks_safe` substitutes a Black-style modeled gamma if broker gamma OR delta is zero. A broker-gamma-only audit cannot certify that every *legacy* output used broker gamma. Before publishing modeled dealer hedging, separately compare raw vs transformed Greeks and instrument multiplier; price-based gamma reprojection requires a validated time-to-expiry, dividend/rate convention, and specified price underlying.
+
+### New receipt-bracketed FYERS option snapshot capture (opt-in)
+
+For future option OI comparisons, capture **two** responses for the same expiry/strike universe around three minutes apart. The API request `timestamp` is always the **expiry selector**, not observation time.
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_option_receipt_capture.py tests/test_option_timing_gex_assumptions.py
+
+$PY -m nifty_l2.option_receipt_capture --live \
+  --token-path /home/ubuntu/.config/nifty-layer2/fyers-token.json \
+  --strikecount 10 \
+  --report ~/nifty-validation-reports/option-receipt-a.json
+
+# Execute a second independent command roughly three minutes after the first;
+# do not reuse an existing output filename.
+$PY -m nifty_l2.option_receipt_capture --live \
+  --token-path /home/ubuntu/.config/nifty-layer2/fyers-token.json \
+  --strikecount 10 \
+  --report ~/nifty-validation-reports/option-receipt-b.json
+
+$PY -m nifty_l2.option_receipt_capture \
+  --compare ~/nifty-validation-reports/option-receipt-a.json \
+            ~/nifty-validation-reports/option-receipt-b.json
+```
+
+This prints a **receipt-time** OI delta per matching contract only when expiry, universe, latency and observation spacing pass. The two independent captures each make two read-only FYERS optionchain calls. Do not claim exchange-level OI cadence or seller-only writing/covering from these differences. Store reports privately; they include contract OI, not credentials. If after-market, receipt comparisons do not validate active intraday market flow.
