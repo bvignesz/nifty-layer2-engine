@@ -64,3 +64,30 @@ def test_missing_or_zero_futures_oi_fails():
     assert result["unique_completed_bars"]==6
     assert result["positive_oi_bars"]==0
     assert summarize_futures({"s":"error","candles":[]},asof=at)["status"]=="FAIL"
+
+def test_futures_duplicate_conflict_is_not_silently_deduplicated():
+    at=datetime.fromisoformat("2026-11-05T09:15:00+05:30")
+    bars=[_candle(at+timedelta(minutes=3*i)) for i in range(6)]
+    exact=bars[0].copy()
+    different=bars[0].copy()
+    different[6]=9999
+    summary=summarize_futures({"s":"ok","candles":[*bars,exact,different]},
+                              asof=at+timedelta(minutes=25))
+    assert summary["duplicate_timestamps"]==2
+    assert summary["identical_duplicate_rows"]==1
+    assert summary["conflicting_duplicate_rows"]==1
+    assert summary["unique_completed_bars"]==6
+    assert summary["status"]=="FUTURES_HISTORY_CONFLICTS_REVIEW_REQUIRED"
+    assert summary["conflict_samples_ist"]==[at.isoformat()]
+
+def test_session_exclusions_keep_local_samples_and_1540_fo_close():
+    at=datetime.fromisoformat("2026-11-05T15:33:00+05:30")
+    # 15:33 start + 3m is valid for the NSE equity derivatives 15:40 close.
+    valid=[_candle(at)]
+    outside=_candle(at+timedelta(minutes=6)) # 15:39+3m=15:42
+    summary=summarize_futures({"s":"ok","candles":[*valid,outside]},
+                              asof=at+timedelta(minutes=20))
+    assert summary["completed_rows"]==1
+    assert summary["after_session_rows"]==1
+    assert summary["after_session_samples_ist"]==[
+        (at+timedelta(minutes=6)).isoformat()]
