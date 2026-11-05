@@ -247,3 +247,25 @@ $PY -m nifty_l2.option_receipt_capture \
 ```
 
 This prints a **receipt-time** OI delta per matching contract only when expiry, universe, latency and observation spacing pass. The two independent captures each make two read-only FYERS optionchain calls. Do not claim exchange-level OI cadence or seller-only writing/covering from these differences. Store reports privately; they include contract OI, not credentials. If after-market, receipt comparisons do not validate active intraday market flow.
+
+## FYERS vs NSE OI unit reconciliation — research only
+
+**Verified public references:** The NSE option-chain page explicitly states "Volume and Open Interest, displayed in Contracts" (https://www.nseindia.com/option-chain). FYERS optionchain API documentation (https://fyers.in/api-docs/v3/api/market-data/option-chain) describes `oi` but does NOT explicitly resolve whether its API payload is contract count or underlying units. NSE circular `NSE/FAOP/70616` revised the NIFTY market lot from 75 to 65 for applicable contracts; verify the actual contract's lot in symbol/contract master.
+
+`nifty_l2.oi_unit_reconciliation` is a **READ ONLY** archive audit, first calculating the portion of positive FYERS option OI values divisible by the supplied lot. This can suggest the broker reports underlying units, but **does not prove** the quantity basis or accuracy. It can also compare to a hand-sourced, appropriately licensed NSE OI-in-CONTRACTS reference CSV by exact symbol, strike, CE/PE, expiry ID, and no more than 180 seconds between the independent reference time and FYERS receipt time. API quote and NSE update timing differ, so even matching ratios are only candidate evidence until independently corroborated.
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_oi_unit_reconciliation.py
+$PY -m nifty_l2.oi_unit_reconciliation \
+  --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db \
+  --lot-size 65 \
+  --report ~/nifty-validation-reports/oi-unit-audit.json
+```
+
+Optional independent CSV schema:
+`observed_at_utc,expiry_id,symbol,strike,option_type,nse_oi_contracts`.
+Only prepare this file from permitted/authorized independently recorded NSE data with actual observation time. The `expiry_id` is the exact FYERS selected expiry epoch and the symbol is the exact FYERS contract identifier from your broker symbol master. Do not scrape or bypass NSE website use restrictions. To compare, rerun this audit with `--nse-reference-csv /secure/path/nse-oi-reference.csv` and a **new** `--report` filename. This procedure never treats a FYERS receipt time as an actual exchange update timestamp, and does not certify dealer positioning or real GEX. Existing engine runs unchanged.
