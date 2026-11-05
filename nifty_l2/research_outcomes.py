@@ -22,7 +22,9 @@ def label_one(observed_at,entry_price,closed_bars,horizon_minutes,*,max_lag_seco
     if not isinstance(entry_price,(int,float)) or not isfinite(entry_price) or entry_price<=0:
         return {"status":"UNAVAILABLE","reason":"Missing verified entry price"}
     target=start+timedelta(minutes=horizon_minutes)
-    if (target.astimezone(IST).date()!=start.astimezone(IST).date()\n        or start.astimezone(IST).time()<time(9,15)\n        or target.astimezone(IST).time()>time(15,30)):
+    if (target.astimezone(IST).date()!=start.astimezone(IST).date()
+        or start.astimezone(IST).time()<time(9,15)
+        or target.astimezone(IST).time()>time(15,30)):
         return {"status":"CROSSES_SESSION","reason":"Target outside same session"}
     valid=[]
     for row in closed_bars:
