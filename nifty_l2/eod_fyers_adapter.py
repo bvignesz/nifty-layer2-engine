@@ -13,7 +13,7 @@ def validate_symbol(symbol):
         raise ValueError("Explicit FYERS NSE symbol required; never guess tickers")
     if not (symbol.endswith("-EQ") or symbol.endswith("-INDEX")):
         raise ValueError("Only verified NSE equity/index symbols supported")
-    if len(symbol)>80 or any(c in symbol for c in "\\n\\r\\t ,;"):
+    if len(symbol)>80 or any(c.isspace() or c in ",;" for c in symbol):
         raise ValueError("Malformed symbol")
     return symbol
 
