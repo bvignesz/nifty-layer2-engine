@@ -14,7 +14,9 @@ from .storage import IST
 from .market_calendar import session
 
 def _utc(value):
-    return datetime.fromisoformat(str(value).replace("Z","+00:00")).astimezone(timezone.utc)
+    dt=datetime.fromisoformat(str(value).replace("Z","+00:00"))
+    if dt.tzinfo is None:raise ValueError("Naive timestamp is not exchange-verified")
+    return dt.astimezone(timezone.utc)
 
 def inspect_db(path):
     path=Path(path).expanduser().resolve()
