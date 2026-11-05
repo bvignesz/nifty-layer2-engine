@@ -30,7 +30,7 @@ def snapshots(directory, params):
     start = int(datetime.combine(day, time.min, IST).timestamp())
     end = int(datetime.combine(day + timedelta(days=1), time.min, IST).timestamp())
     result = dict(day=day.isoformat(), expiry=expiry, strike=strike, page=page,
-                  expiries=[], strikes=[], rows=[], total=0, error='')
+                  expiries=[], strikes=[], rows=[], prior_rows=[], total=0, error='')
     database = directory / 'research.db'
     if not database.exists():
         return result
@@ -50,8 +50,19 @@ def snapshots(directory, params):
                 result['total'] = conn.execute('SELECT count(DISTINCT s.ts)' + base + ' AND s.strike=?', (*args, strike_number)).fetchone()[0]
                 times = [r[0] for r in conn.execute('SELECT DISTINCT s.ts' + base + ' AND s.strike=? ORDER BY s.ts DESC LIMIT 12 OFFSET ?', (*args, strike_number, page * 12))]
                 if times:
-                    marks = ','.join('?' for _ in times)
-                    result['rows'] = conn.execute('SELECT s.ts,s.opt_type,s.oi,s.volume,s.ltp,s.bid,s.ask,s.gamma,h.fut_close' + base + f' AND s.strike=? AND s.ts IN ({marks}) ORDER BY s.ts DESC,s.opt_type', (*args, strike_number, *times)).fetchall()
+                    # Read exactly one older snapshot for the oldest visible observation.
+                    # This makes deltas at page boundaries correct; no across-day lookback.
+                    preceding = conn.execute('SELECT MAX(s.ts)' + base +
+                        ' AND s.strike=? AND s.ts<?', (*args, strike_number, min(times))).fetchone()[0]
+                    all_times = times + ([preceding] if preceding is not None else [])
+                    marks = ','.join('?' for _ in all_times)
+                    selected = conn.execute(
+                        'SELECT s.ts,s.opt_type,s.oi,s.volume,s.ltp,s.bid,s.ask,s.gamma,'
+                        'h.fut_close,h.fut_oi,h.spot' + base +
+                        f' AND s.strike=? AND s.ts IN ({marks}) ORDER BY s.ts DESC,s.opt_type',
+                        (*args, strike_number, *all_times)).fetchall()
+                    result['rows'] = [r for r in selected if r[0] in times]
+                    result['prior_rows'] = [r for r in selected if r[0] == preceding] if preceding is not None else []
     except sqlite3.Error:
         result['error'] = 'Snapshot history is temporarily unavailable.'
     return result
@@ -64,7 +75,7 @@ def display_rows(data):
     for row in data['rows']:
         yield (datetime.fromtimestamp(row[0], IST).strftime('%H:%M:%S'), row[1], *(
             'Unavailable' if value is None else format(value, ',.6f' if index == 7 else ',.2f')
-            for index, value in enumerate(row[2:], 2)))
+            for index, value in enumerate(row[2:9], 2)))
 
 
 def history_html(data):
