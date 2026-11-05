@@ -269,3 +269,30 @@ $PY -m nifty_l2.oi_unit_reconciliation \
 Optional independent CSV schema:
 `observed_at_utc,expiry_id,symbol,strike,option_type,nse_oi_contracts`.
 Only prepare this file from permitted/authorized independently recorded NSE data with actual observation time. The `expiry_id` is the exact FYERS selected expiry epoch and the symbol is the exact FYERS contract identifier from your broker symbol master. Do not scrape or bypass NSE website use restrictions. To compare, rerun this audit with `--nse-reference-csv /secure/path/nse-oi-reference.csv` and a **new** `--report` filename. This procedure never treats a FYERS receipt time as an actual exchange update timestamp, and does not certify dealer positioning or real GEX. Existing engine runs unchanged.
+
+## Independent gamma calculation milestone
+
+Added `nifty_l2.gamma_model_parity` using a separate Black-76 analytic gamma implementation (no import from the frozen nine-check engine). Tests cover the analytic formula at-the-money, missing/invalid IV, broker/model gamma comparison, and read-only archive behavior.
+
+**Critical interpretation:** the archived broker option-chain gamma and IV do not include an independently verified synchronized pricing forward, per-option OI update time, or an authoritative exact expiry cutoff. Therefore the module requires an **explicit assumed forward price** and **explicit time of expiry**. It does *not* call the resulting comparison broker-Greek validation, nor does it apply any gamma/GEX conversion to production.
+
+This is a reproducible **sensitivity/plausibility check**, *not* synchronized independent parity. Do not invent actual forward or expiry cut-off inputs. Obtain them from a reliable contemporaneous futures quote and contract specification before interpreting comparisons:
+
+```bash
+cd ~/nifty-platform-validation
+git fetch origin
+git switch --detach origin/feat/research-platform-milestones-2-8
+PY=/home/ubuntu/nifty-layer2-engine/.venv/bin/python
+$PY -m pytest -q tests/test_gamma_model_parity.py
+
+# Only when the values below have been independently verified for the
+# archived option expiry and observation timestamps:
+$PY -m nifty_l2.gamma_model_parity \
+  --db /home/ubuntu/.config/nifty-layer2/web-runtime/research.db \
+  --assumed-forward <VERIFIED_FORWARD_PRICE> \
+  --expiry-at <VERIFIED_EXPIRY_IN_ISO8601_WITH_OFFSET> \
+  --rate 0 \
+  --report ~/nifty-validation-reports/gamma-parity-research.json
+```
+
+Rates, forward, IV units and theta conventions differ by vendor; a hypothetical constant forward across 111 observations is too weak to certify a broker. GEX magnitude remains `OI_UNITS_UNVERIFIED` until authoritative evidence (e.g. time-aligned independently sourced NSE contract counts or an explicit supported FYERS API contract specification) resolves the incoming quantity units. Actual dealer inventory signs are never inferable from total open interest alone.
