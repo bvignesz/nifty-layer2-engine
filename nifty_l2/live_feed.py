@@ -92,7 +92,7 @@ def store_once(db_path,packet):
     path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
     with sqlite3.connect(path,timeout=10) as db:
         db.executescript(DDL)
-        db.execute("INSERT INTO feed_receipts VALUES(?,?,?,?,?,?,?,?)",
+        db.execute("INSERT INTO feed_receipts VALUES(?,?,?,?,?,?,?,?,?)",
             (packet["receipt_utc"],packet["request_start_utc"],
              packet["request_end_utc"],packet["source"],packet["expiry_id"],
              packet["expiry_date"],packet["future_symbol"],
