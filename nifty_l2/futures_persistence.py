@@ -9,6 +9,7 @@ def latest_completed_future(calls, observed_at, max_age_seconds=900):
         raise ValueError("Observation time must include timezone")
     observed = observed.astimezone(timezone.utc)
     candidates = []
+    signatures = {}
     for call in calls:
         if not isinstance(call, dict) or call.get("method") != "history":
             continue
@@ -43,10 +44,20 @@ def latest_completed_future(calls, observed_at, max_age_seconds=900):
             age = (observed - close_time).total_seconds()
             if not 0 <= age <= max_age_seconds:
                 continue
-            candidates.append((start, symbol, close, oi, res))
+            key = (symbol, minutes, start)
+            signature = (o, h, l, close, volume, oi)
+            if key in signatures and signatures[key] != signature:
+                # No first/last/average policy is supported for conflicting bars.
+                return None
+            signatures[key] = signature
+            candidates.append((start, symbol, close, oi, res, minutes))
     if not candidates:
         return None
-    start, symbol, close, oi, response = max(candidates, key=lambda item: item[0])
+    latest_start = max(item[0] for item in candidates)
+    latest = [item for item in candidates if item[0] == latest_start]
+    if len({(item[1], item[5]) for item in latest}) != 1:
+        return None  # Contract or resolution ambiguity must be reviewed.
+    start, symbol, close, oi, response, _ = latest[0]
     return {"start": start, "symbol": symbol, "close": close, "oi": oi, "response": response}
 
 def persist_futures(conn, event_id, calls, observed_at):

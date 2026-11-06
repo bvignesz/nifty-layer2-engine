@@ -61,3 +61,26 @@ def test_backfill_produces_copy_only_preserving_original(tmp_path):
         pass
     else:
         raise AssertionError("A past normalized snapshot must never be overwritten")
+
+
+def test_duplicate_candles_fail_closed_for_any_ohlcv_or_oi_conflict():
+    from copy import deepcopy
+    now=datetime.fromisoformat("2026-11-05T10:30:00+05:30")
+    for column in range(1,7):
+        calls=recorded(now)
+        duplicate=deepcopy(calls[0]["response"]["candles"][0])
+        duplicate[column]+=1
+        calls[0]["response"]["candles"].append(duplicate)
+        assert latest_completed_future(calls,now) is None
+        calls[0]["response"]["candles"].reverse()
+        assert latest_completed_future(calls,now) is None
+
+
+def test_identical_duplicates_and_ambiguous_contracts():
+    from copy import deepcopy
+    now=datetime.fromisoformat("2026-11-05T10:30:00+05:30")
+    calls=recorded(now)
+    calls.append(deepcopy(calls[0]))
+    assert latest_completed_future(calls,now)["oi"]==50000
+    calls[1]["request"]["symbol"]="NSE:NIFTY26DECFUT"
+    assert latest_completed_future(calls,now) is None
