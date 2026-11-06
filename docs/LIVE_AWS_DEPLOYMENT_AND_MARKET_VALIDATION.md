@@ -54,7 +54,7 @@ $PY -m nifty_l2.desk_preview \
   --db ~/.config/nifty-layer2/web-runtime/research.db --port 8787
 ```
 
-The normal authenticated `nifty_l2.web` route `/desk` includes `market_feed.db` only if it is in the **same runtime directory** as `research.db`. The isolated preview currently uses the existing research DB parent and **does not automatically ingest the separate live-runtime path**. To show the new feed, configure an explicit and reviewed read-only path bridge or move both into an isolated copied runtime **before** production switch. Never overwrite the real production research DB.
+The authenticated `/desk` and isolated SSH preview read the original `research.db` through read-only SQLite and automatically discover the sibling `~/.config/nifty-layer2/live-runtime/market_feed.db` when available. The existing research database is **not modified**, and the panel labels option-chain receipts separately from completed futures bars. Never expose the loopback preview publicly.
 
 ## E. Optional continuously running development-only service
 
