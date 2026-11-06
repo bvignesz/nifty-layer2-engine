@@ -9,6 +9,7 @@ from html import escape
 from pathlib import Path
 import json,sqlite3
 from .live_feed import latest_feed
+from .futures_one_minute import futures_oi_quadrant
 
 def signed_gamma_scenario(legs,future_price,*,oi_unit=None,lot_size=None):
     """Signed-OI *scenario*, not observed dealer exposure; requires explicit unit assumption."""
@@ -44,7 +45,8 @@ def live_readmodel(directory,*,now=None,oi_unit=None,lot_size=None):
     latest=latest_feed(path)
     base={"status":latest["status"],"observed_receipt":None,
       "freshness_seconds":None,"ce_wall":None,"pe_wall":None,
-      "futures_1m":None,"gex":{"status":"OI_UNITS_AND_DEALER_SIGN_UNVERIFIED"},
+      "futures_1m":None,"futures_quadrant":"UNAVAILABLE",
+      "gex":{"status":"OI_UNITS_AND_DEALER_SIGN_UNVERIFIED"},
       "oi_delta_basis":"ONLY_MATCHED_EXACT_CONTRACT_RECEIPT_PAIRS",
       "oi_synchronized_with_futures":False,"orders_enabled":False}
     if latest["status"]!="RECORDED":return base
@@ -68,6 +70,8 @@ def live_readmodel(directory,*,now=None,oi_unit=None,lot_size=None):
             datetime.fromisoformat(b["bar_close_utc"])<=recv]
         if bars:
             base["futures_1m"]=bars[-1]
+            if len(bars)>1:
+                base["futures_quadrant"]=futures_oi_quadrant(bars[-2],bars[-1])
     if base["futures_1m"] is not None:
         base["gex"]=signed_gamma_scenario(opts,base["futures_1m"]["close"],
             oi_unit=oi_unit,lot_size=lot_size)
@@ -107,8 +111,13 @@ def render_live_feed(payload):
      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">'
      '<div>PE wall<br><strong>'+wall("pe_wall")+'</strong></div>'
      '<div>CE wall<br><strong>'+wall("ce_wall")+'</strong></div>'
-     '<div>Completed 1m futures<br><strong>'+future+'</strong></div>'
-     '<div>GEX<br><strong>'+val(payload["gex"]["status"])+'</strong></div>'
+     '<div>Completed 1m futures<br><strong>'+future+'</strong><p>'+val(payload["futures_quadrant"])+'</p></div>'
+     '<div>GEX model<br><strong>'+val(payload["gex"]["status"])+'</strong>'
+     + ('<p>CE '+val(round(payload["gex"]["ce_gex_cr_per_1pct"],2))+
+           ' Cr / PE '+val(round(payload["gex"]["pe_gex_cr_per_1pct"],2))+
+           ' Cr / Net '+val(round(payload["gex"]["net_gex_cr_per_1pct"],2))+' Cr per 1%</p>'
+           if payload["gex"]["status"]=="SIGNED_OI_SCENARIO" else '')+
+     '</div>'
      '</div><p>Options OI is a REST receipt, not exchange-synchronized 1-minute OI. '
      'GEX cannot be scaled reliably without verified quantity units and assumed dealer signs. '
      'No trading orders are placed.</p></section>')
