@@ -26,6 +26,7 @@ from .microstructure_terminal import read_rows as microstructure_rows, render as
 from .desk_readmodel import desk_snapshot
 from .desk_pages import render_desk
 from .live_feed_view import live_readmodel, render_live_feed
+from .swing_pages import swing_snapshot, render_swing
 import sqlite3
 
 
@@ -242,7 +243,14 @@ def handler_for(app):
             if not self.authorized():
                 return
             path = urlparse(self.path).path
-            if path == '/desk':
+            if path == '/swing':
+                try:
+                    q=parse_qs(urlparse(self.path).query)
+                    payload=swing_snapshot(app.runner.directory,track=q.get('track',['ALL'])[0])
+                    self.respond(200,render_swing(payload))
+                except (ValueError,OverflowError,OSError):
+                    self.respond(400,'Invalid swing filter',content_type='text/plain; charset=utf-8')
+            elif path == '/desk':
                 try:
                     params=parse_qs(urlparse(self.path).query)
                     day=params.get('date',[datetime.now(IST).date().isoformat()])[0]
@@ -265,11 +273,13 @@ def handler_for(app):
                     self.respond(200, render_research_page(app.runner.directory, path.lstrip('/'), parse_qs(urlparse(self.path).query)))
                 except (ValueError, OverflowError, sqlite3.Error):
                     self.respond(400, 'Invalid research filter', content_type='text/plain; charset=utf-8')
-            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness','/api/v1/microstructure','/api/v1/desk','/api/v1/live-feed'):
+            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness','/api/v1/microstructure','/api/v1/desk','/api/v1/live-feed','/api/v1/swing'):
                 try:
                     q = parse_qs(urlparse(self.path).query)
                     day = q.get('date', [datetime.now(IST).date().isoformat()])[0]
-                    if path == '/api/v1/live-feed':
+                    if path == '/api/v1/swing':
+                        payload = swing_snapshot(app.runner.directory,track=q.get('track',['ALL'])[0])
+                    elif path == '/api/v1/live-feed':
                         payload = live_readmodel(app.runner.directory)
                     elif path == '/api/v1/desk':
                         payload = desk_snapshot(app.runner.directory,day,limit=q.get('limit',['40'])[0])
