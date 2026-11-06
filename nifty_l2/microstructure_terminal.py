@@ -60,7 +60,6 @@ def read_rows(directory,day,limit=40):
             tagged.append((t,classification,state))
         except (ValueError,TypeError):
             continue
-    previous={}
     for index,h in enumerate(headers[:-1] if len(headers)>limit else headers):
         ts,ist_time,spot,fut_close,fut_vwap,fut_oi,expiry=h
         legs=by_time.get(ts,{})
@@ -85,6 +84,32 @@ def read_rows(directory,day,limit=40):
             return {"oi_delta":oi_delta,"volume_increment":dv if dv is not None and dv>=0 else None}
         ce_delta=deltas(ce)
         pe_delta=deltas(pe)
+        def side_summary(side):
+            current={x["symbol"]:x for x in legs.values() if x["side"]==side
+                     and x["symbol"] and x["oi"] is not None}
+            earlier={x["symbol"]:x for x in old.values() if x["side"]==side
+                     and x["symbol"] and x["oi"] is not None}
+            total_oi=sum(x["oi"] for x in current.values()) if current else None
+            valid=(comparable and current and set(current)==set(earlier)
+                 and headers[index+1][6]==expiry)
+            if not valid:
+                return {"observed_subset_oi":total_oi,"oi_delta":None,
+                        "volume_increment":None,"comparable":False,
+                        "coverage_count":len(current)}
+            change=sum(current[k]["oi"]-earlier[k]["oi"] for k in current)
+            increments=[]
+            for k in current:
+                curvol,oldvol=current[k]["volume_cumulative"],earlier[k]["volume_cumulative"]
+                if curvol is None or oldvol is None or curvol<oldvol:
+                    return {"observed_subset_oi":total_oi,"oi_delta":change,
+                            "volume_increment":None,"comparable":True,
+                            "coverage_count":len(current)}
+                increments.append(curvol-oldvol)
+            return {"observed_subset_oi":total_oi,"oi_delta":change,
+                    "volume_increment":sum(increments),"comparable":True,
+                    "coverage_count":len(current)}
+        ce_summary=side_summary("CE")
+        pe_summary=side_summary("PE")
         nearest=min(tagged,key=lambda r:abs(r[0]-ts)) if tagged else None
         if nearest and abs(nearest[0]-ts)<=30:
             classification,state=nearest[1],nearest[2]
@@ -106,6 +131,7 @@ def read_rows(directory,day,limit=40):
              if isinstance(fut_close,(int,float)) and isinstance(fut_vwap,(int,float)) and fut_vwap>0 else "UNAVAILABLE",
           "ce_wall":ce,"pe_wall":pe,
           "ce_wall_delta":ce_delta,"pe_wall_delta":pe_delta,
+          "ce_observed_subset":ce_summary,"pe_observed_subset":pe_summary,
           "snapshot_gap_seconds":gap,"contract_delta_comparable":comparable,
           "legacy_research_bias":bias,"bull_checks":bull,"bear_checks":bear,
           "legacy_gex_scenario":gex,"validated_classification":classification,
@@ -127,6 +153,14 @@ def render(data):
               +" | ΔOI "+_num(delta["oi_delta"])+" | ΔVol "+_num(delta["volume_increment"]))
         def cls(bias):
             return "up" if bias in ("BULL","BULLISH") else "down" if bias in ("BEAR","BEARISH") else ""
+        ce_summary=r["ce_observed_subset"]
+        pe_summary=r["pe_observed_subset"]
+        observed_flow=("PE subset OI "+_num(pe_summary["observed_subset_oi"])+
+          " | Δ "+_num(pe_summary["oi_delta"])+
+          " / CE subset OI "+_num(ce_summary["observed_subset_oi"])+
+          " | Δ "+_num(ce_summary["oi_delta"])+
+          " / ΔVolume PE "+_num(pe_summary["volume_increment"])+
+          " CE "+_num(ce_summary["volume_increment"]))
         cells=[
             td(when+" IST | RECEIPT", "time"),
             td(str(r["legacy_research_bias"])+" | B:"+str(r["bull_checks"] or "—")
@@ -134,7 +168,7 @@ def render(data):
             td(wall(pe,r["pe_wall_delta"])),
             td(wall(ce,r["ce_wall_delta"])),
             td(_num(r["legacy_gex_scenario"],2)+" | MODEL SCENARIO"),
-            td("ΔOI proxy only; seller identity unavailable"),
+            td(observed_flow+" | Seller identity unavailable"),
             td("Fut "+_num(r["futures_close_stored"],2)+
                " | VWAP "+_num(r["futures_vwap_stored"],2)+
                " | OI "+_num(r["futures_oi_stored"])),
