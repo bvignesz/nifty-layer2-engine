@@ -11,7 +11,7 @@ def test_approximate_value_area_profile_is_deterministic():
     out=approximate_volume_profile(rows,tick_size=1,value_area_fraction=.7)
     assert out["poc"]==100
     assert out["val"]==100
-    assert out["vah"]==101
+    assert out["vah"]==100  # POC alone covers 130/180 > 70%
     assert out["bar_count"]==3
     assert abs(out["total_volume"]-180)<1e-8
     assert out["tick_accurate"] is False
