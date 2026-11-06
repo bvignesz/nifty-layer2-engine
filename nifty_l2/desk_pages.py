@@ -6,13 +6,16 @@ def render_desk(data):
     html=render_microstructure(data)
     flags=data["readiness"]
     counts=data["counts"]
+    journal=data.get("journal",{})
     states=[
       ("Stored research runs",counts["research_runs"]),
       ("Completed futures records",counts["futures_bars"]),
       ("Validated forward labels",counts["valid_outcomes"]),
       ("Live option exchange stamps","verified in events" if flags["live_option_exchange_timestamps_verified"] else "not verified"),
       ("Historical bid/ask option fills","not verified"),
-      ("Trading mode","MANUAL REVIEW ONLY")]
+      ("Trading mode","MANUAL REVIEW ONLY"),
+      ("Manual trades recorded",journal.get("total",0)),
+      ("Journal mean realized R",journal.get("mean_realized_r") if journal.get("mean_realized_r") is not None else "—")]
     cards=''.join('<div style="background:#101d32;border:1px solid #283b53;border-radius:7px;padding:12px">'
           '<div style="color:#98b2ce;font-size:11px">'+escape(str(label))+'</div>'
           '<strong style="display:block;margin-top:6px">'+escape(str(value))+'</strong></div>'
