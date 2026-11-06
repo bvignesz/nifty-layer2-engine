@@ -318,3 +318,16 @@ $PY -m nifty_l2.synchronized_greeks_capture --live \
 ```
 
 The result must be treated as research-only, not as approval for live trading, dealer GEX, or an automated order.
+
+## 6 November 2026 safe report reservation and evidence update
+
+Synchronized Greek capture now reserves a private exclusive output file **before**
+loading credentials or making any FYERS request. Existing paths (including
+symlinks) fail immediately with instructions to choose another `--report` name.
+No previous report is removed or replaced. Failure/interruption can leave a
+failure/partial reserved file; inspect it and use a new filename for any retry.
+Schema v2 reports separate futures request/receipt times and source quotes,
+missing fields, unverified contract lots and explicit partial coverage/staleness.
+See [the development evidence report](CODEX_VALIDATION_2026-11-06.md) for the
+110-test run, fresh read-only archive audits, market-hours four-call capture,
+remaining blockers and rollback plan. This is not deployment approval.

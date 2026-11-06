@@ -57,6 +57,8 @@ def gex_sensitivity(legs, *, underlying, lot_size, oi_basis="unknown"):
     scale=lot_size if oi_basis=="contracts" else 1
     ce,pe=call*scale,put*scale
     output={
+        "label":"SIGNED-OI GEX SCENARIO — UNVERIFIED",
+        "lot_size_verified":False,
         "status":"SCENARIO_ONLY" if oi_basis!="unknown" else "OI_UNITS_UNVERIFIED",
         "counts":dict(counts),
         "oi_basis":oi_basis,"lot_size":lot_size,
