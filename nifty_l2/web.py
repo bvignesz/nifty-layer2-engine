@@ -25,6 +25,7 @@ from .research_pages import render as render_research_page
 from .microstructure_terminal import read_rows as microstructure_rows, render as microstructure_page
 from .desk_readmodel import desk_snapshot
 from .desk_pages import render_desk
+from .live_feed_view import live_readmodel, render_live_feed
 import sqlite3
 
 
@@ -245,7 +246,11 @@ def handler_for(app):
                 try:
                     params=parse_qs(urlparse(self.path).query)
                     day=params.get('date',[datetime.now(IST).date().isoformat()])[0]
-                    self.respond(200,render_desk(desk_snapshot(app.runner.directory,day)))
+                    desk=desk_snapshot(app.runner.directory,day)
+                    live=live_readmodel(app.runner.directory)
+                    page=render_desk(desk)
+                    page=page.replace('<div class="panel">',render_live_feed(live)+'<div class="panel">',1)
+                    self.respond(200,page)
                 except (ValueError, OverflowError, sqlite3.Error):
                     self.respond(400,'Invalid desk date',content_type='text/plain; charset=utf-8')
             elif path == '/microstructure':
@@ -260,11 +265,13 @@ def handler_for(app):
                     self.respond(200, render_research_page(app.runner.directory, path.lstrip('/'), parse_qs(urlparse(self.path).query)))
                 except (ValueError, OverflowError, sqlite3.Error):
                     self.respond(400, 'Invalid research filter', content_type='text/plain; charset=utf-8')
-            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness','/api/v1/microstructure','/api/v1/desk'):
+            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness','/api/v1/microstructure','/api/v1/desk','/api/v1/live-feed'):
                 try:
                     q = parse_qs(urlparse(self.path).query)
                     day = q.get('date', [datetime.now(IST).date().isoformat()])[0]
-                    if path == '/api/v1/desk':
+                    if path == '/api/v1/live-feed':
+                        payload = live_readmodel(app.runner.directory)
+                    elif path == '/api/v1/desk':
                         payload = desk_snapshot(app.runner.directory,day,limit=q.get('limit',['40'])[0])
                     elif path == '/api/v1/microstructure':
                         payload = microstructure_rows(app.runner.directory,day,q.get('limit',['40'])[0])
