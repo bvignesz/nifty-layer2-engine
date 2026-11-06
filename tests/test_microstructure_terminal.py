@@ -30,6 +30,9 @@ def test_microstructure_uses_real_same_contract_deltas_and_no_trade(tmp_path):
     assert data["status"]=="AVAILABLE"
     assert data["rows"][0]["ce_wall_delta"]["oi_delta"]==1300
     assert data["rows"][0]["ce_wall_delta"]["volume_increment"]==30
+    assert data["rows"][0]["ce_observed_subset"]["oi_delta"]==1300
+    assert data["rows"][0]["ce_observed_subset"]["volume_increment"]==30
+    assert data["rows"][0]["pe_observed_subset"]["oi_delta"]==0
     assert data["rows"][0]["one_minute_candle_verified"] is False
     assert data["rows"][0]["legacy_research_bias"]=="BULL"
     assert data["rows"][0]["validated_classification"]=="No Trade"
@@ -53,6 +56,7 @@ def test_microstructure_rejects_noncomparable_contract_or_volume_reset(tmp_path)
                       (ts,24500,"CE",sym,65000,vol))
     data=read_rows(directory,"2026-11-05")
     assert data["rows"][0]["ce_wall_delta"]=={"oi_delta":None,"volume_increment":None}
+    assert data["rows"][0]["ce_observed_subset"]["oi_delta"] is None
 
 def test_microstructure_routes_require_login_and_render_empty(tmp_path):
     app=App("https://research.example.com","","APP","SECRET",
