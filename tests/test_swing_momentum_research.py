@@ -16,7 +16,7 @@ def test_point_in_time_rank_and_liquidity():
     assert result["rejected"]["LOW"]=="LOW_LIQUIDITY"
     assert "EXCLUDED" not in [x["symbol"] for x in result["ranked"]]
 def test_future_and_insufficient_data_fail_closed():
-    result=rank_universe({"AAA":history()[:30],
+    result=rank_universe({"AAA":history()[:10],
           "FUTURE":history()},["AAA","FUTURE"],as_of="2025-01-15")
     assert result["status"]=="NO_CANDIDATES"
     assert result["rejected"]["AAA"]=="INSUFFICIENT_BARS"
