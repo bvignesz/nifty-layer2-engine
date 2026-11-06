@@ -40,3 +40,15 @@ def test_stale_feed_disables_live_label(tmp_path):
     store_once(db,packet(NOW-timedelta(minutes=10),14500))
     data=live_readmodel(tmp_path,now=NOW)
     assert data["status"]=="STALE_OR_FUTURE_RECEIPT"
+
+
+def test_gex_only_with_explicit_assumptions():
+    from nifty_l2.live_feed_view import signed_gamma_scenario
+    legs=[{'side':'CE','oi':10000,'gamma':.001},{'side':'PE','oi':9000,'gamma':.002}]
+    assert signed_gamma_scenario(legs,24500)['status']=='OI_UNITS_AND_DEALER_SIGN_UNVERIFIED'
+    g=signed_gamma_scenario(legs,24500,oi_unit='underlying_units')
+    assert g['status']=='SIGNED_OI_SCENARIO'
+    assert g['pe_gex_cr_per_1pct']<0
+    assert g['net_gex_cr_per_1pct']<0
+    assert not g['dealer_inventory_observed']
+    assert signed_gamma_scenario(legs,24500,oi_unit='contracts')['status']=='MISSING_VERIFIED_LOT_SIZE'
