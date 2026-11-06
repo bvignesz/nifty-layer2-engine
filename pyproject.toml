@@ -11,13 +11,14 @@ dependencies = []
 [project.optional-dependencies]
 research = ["numpy>=1.26,<3", "pandas>=2.1,<3", "scipy>=1.11,<2"]
 test = ["pytest>=8,<10"]
+ml = ["xgboost>=2,<4", "scikit-learn>=1.4,<2"]
 
 [project.scripts]
 nifty-l2 = "nifty_l2.cli:main"
 nifty-l2-web = "nifty_l2.web:main"
 
 [tool.setuptools.packages.find]
-include = ["nifty_l2*"]
+include = ["nifty_l2*", "eod_scanner*"]
 
 [tool.setuptools.package-data]
 nifty_l2 = ["schema.sql"]

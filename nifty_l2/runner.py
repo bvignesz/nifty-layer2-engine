@@ -18,6 +18,7 @@ from types import SimpleNamespace
 
 from . import fyers
 from .storage import Store, canonical, digest, timestamp
+from .futures_persistence import persist_futures
 
 
 class ReadOnlyClient:
@@ -69,6 +70,9 @@ def evaluate_once(store, client, now=None, *, run_id=None, scheduled_at=None, tr
             for side, label in [('BULL', 'Bull'), ('BEAR', 'Bear')]:
                 conn.execute('INSERT INTO check_results VALUES (?,?,?,?,?)',
                              (event_id, number, side, row.get(label + '_Status', 'UNAVAILABLE'), canonical(row)))
+        # Archive actual completed futures OHLCV+OI with its *bar-start* exchange time.
+        # Never invent event.exchange_at_utc for an option-chain receipt.
+        persist_futures(conn, event_id, client.calls, now)
         if run_id:
             conn.execute("UPDATE run_log SET status='COMPLETED', finished_at_utc=?, message=?, event_id=? WHERE run_id=?",
                          (timestamp(datetime.now(timezone.utc)), 'Nine checks and raw inputs saved.', event_id, run_id))

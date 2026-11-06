@@ -29,7 +29,7 @@ def test_frozen_legacy_engine_source_is_unchanged():
     """Intentional engine changes require a conscious contract baseline revision."""
     engine = Path(__file__).resolve().parents[1] / "nifty_l2" / "legacy_engine.py"
     raw = engine.read_bytes()
-    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\0" + raw).hexdigest()
+    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
     assert sha == LEGACY_GIT_BLOB_SHA, (
         "Legacy valuation implementation changed. Do NOT auto-update this baseline: "
         "review rule/Greek/futures differences and explicitly version the new engine."
