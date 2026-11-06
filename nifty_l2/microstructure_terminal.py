@@ -110,6 +110,30 @@ def read_rows(directory,day,limit=40):
                     "coverage_count":len(current)}
         ce_summary=side_summary("CE")
         pe_summary=side_summary("PE")
+        def wall_cut(current, delta):
+            if current is None or delta["oi_delta"] is None:
+                return None
+            old_oi=current["oi"]-delta["oi_delta"]
+            return round(-100*delta["oi_delta"]/old_oi,3) if old_oi>0 else None
+        def futures_quadrant():
+            # Observation-to-observation proxy, never a verified completed futures candle.
+            if not comparable or old_ts is None:
+                return "UNAVAILABLE"
+            earlier=headers[index+1]
+            if earlier[6]!=expiry:
+                return "UNAVAILABLE"
+            old_price,old_oi=earlier[3],earlier[5]
+            if not all(isinstance(x,(int,float)) for x in
+                       (fut_close,fut_oi,old_price,old_oi)) or min(fut_close,fut_oi,old_price,old_oi)<=0:
+                return "UNAVAILABLE"
+            dp=fut_close-old_price
+            doi=fut_oi-old_oi
+            if not dp or not doi:return "NEUTRAL"
+            if dp>0 and doi>0:return "LONG_BUILDUP_PROXY"
+            if dp<0 and doi>0:return "SHORT_BUILDUP_PROXY"
+            if dp>0 and doi<0:return "SHORT_COVERING_PROXY"
+            return "LONG_LIQUIDATION_PROXY"
+        futures_read=futures_quadrant()
         nearest=min(tagged,key=lambda r:abs(r[0]-ts)) if tagged else None
         if nearest and abs(nearest[0]-ts)<=30:
             classification,state=nearest[1],nearest[2]
@@ -131,6 +155,9 @@ def read_rows(directory,day,limit=40):
              if isinstance(fut_close,(int,float)) and isinstance(fut_vwap,(int,float)) and fut_vwap>0 else "UNAVAILABLE",
           "ce_wall":ce,"pe_wall":pe,
           "ce_wall_delta":ce_delta,"pe_wall_delta":pe_delta,
+          "ce_wall_cut_pct":wall_cut(ce,ce_delta),
+          "pe_wall_cut_pct":wall_cut(pe,pe_delta),
+          "futures_observation_quadrant":futures_read,
           "ce_observed_subset":ce_summary,"pe_observed_subset":pe_summary,
           "snapshot_gap_seconds":gap,"contract_delta_comparable":comparable,
           "legacy_research_bias":bias,"bull_checks":bull,"bear_checks":bear,
@@ -171,8 +198,11 @@ def render(data):
             td(observed_flow+" | Seller identity unavailable"),
             td("Fut "+_num(r["futures_close_stored"],2)+
                " | VWAP "+_num(r["futures_vwap_stored"],2)+
-               " | OI "+_num(r["futures_oi_stored"])),
-            td("NO TRADE | unvalidated","neutral")]
+               " | OI "+_num(r["futures_oi_stored"])+
+               " | "+r["futures_observation_quadrant"]),
+            td("BULLISH WATCH" if r["legacy_research_bias"]=="BULL" else
+               "BEARISH WATCH" if r["legacy_research_bias"]=="BEAR" else
+               "IGNORE",cls(r["legacy_research_bias"]))]
         rows.append("<tr>"+''.join(cells)+"</tr>")
     title="PRO TRADER ACADEMY · NIFTY MICROSTRUCTURE"
     style="""body{margin:0;background:#09111f;color:#d8e7f7;font:13px system-ui}
@@ -191,9 +221,10 @@ nav{margin:12px 0}"""
     explanation=('<p class="meta">One row per stored observation (nominal 3-minute collection), '
        'NOT a completed one-minute option candle. OI and volume changes require '
        'matching symbols and a 90–360 second receipt gap. Futures OI quadrant and '
-       'seller/buyer identity are not independently established. GEX is a model scenario.</p>')
+       'seller/buyer identity are not independently established. GEX is a model scenario. '
+       'BULLISH/BEARISH WATCH is the existing unvalidated legacy hypothesis, NOT a trade order.</p>')
     heads=("Observed receipt","Legacy bias","PE wall / change","CE wall / change",
-        "GEX scenario","Writing / seller exit","Futures snapshot","Validated action")
+        "GEX scenario","Writing / seller exit","Futures read","Research watch")
     table='<div class="scroll"><table><thead><tr>'+''.join("<th>"+escape(h)+"</th>" for h in heads)+'</tr></thead><tbody>'
     table+=''.join(rows) or '<tr><td colspan="8">No stored observations for the selected date</td></tr>'
     table+='</tbody></table></div>'
