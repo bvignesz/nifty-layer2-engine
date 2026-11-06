@@ -14,6 +14,7 @@ from .storage import IST
 from .desk_readmodel import desk_snapshot
 from .desk_pages import render_desk
 from .live_feed_view import live_readmodel,render_live_feed
+from .swing_pages import swing_snapshot,render_swing
 
 def make_handler(db_path):
     database=Path(db_path).expanduser().resolve()
@@ -22,20 +23,25 @@ def make_handler(db_path):
             pass
         def do_GET(self):
             parsed=urlparse(self.path)
-            if parsed.path not in ("/desk","/api/v1/desk","/"):
+            if parsed.path not in ("/desk","/api/v1/desk","/swing","/api/v1/swing","/"):
                 self.send_error(404);return
             query=parse_qs(parsed.query)
             day=query.get("date",[datetime.now(IST).date().isoformat()])[0]
             try:
-                data=desk_snapshot(database.parent,day,
-                    limit=query.get("limit",["40"])[0])
-                is_json=parsed.path=="/api/v1/desk"
+                is_swing=parsed.path in ("/swing","/api/v1/swing")
+                data=(swing_snapshot(database.parent,track=query.get("track",["ALL"])[0])
+                    if is_swing else desk_snapshot(database.parent,day,
+                    limit=query.get("limit",["40"])[0]))
+                is_json=parsed.path in ("/api/v1/desk","/api/v1/swing")
                 if is_json:
                     body=json.dumps(data,ensure_ascii=False,allow_nan=False).encode("utf-8")
                 else:
-                    page=render_desk(data)
-                    page=page.replace('<div class="panel">',
-                        render_live_feed(live_readmodel(database.parent))+'<div class="panel">',1)
+                    if is_swing:
+                        page=render_swing(data)
+                    else:
+                        page=render_desk(data)
+                        page=page.replace('<div class="panel">',
+                            render_live_feed(live_readmodel(database.parent))+'<div class="panel">',1)
                     body=page.encode("utf-8")
             except (ValueError,OverflowError):
                 self.send_error(400,"Bad date or limit");return
