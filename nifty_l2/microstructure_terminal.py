@@ -222,7 +222,8 @@ nav{margin:12px 0}"""
        'NOT a completed one-minute option candle. OI and volume changes require '
        'matching symbols and a 90–360 second receipt gap. Futures OI quadrant and '
        'seller/buyer identity are not independently established. GEX is a model scenario. '
-       'BULLISH/BEARISH WATCH is the existing unvalidated legacy hypothesis, NOT a trade order.</p>')
+       'BULLISH/BEARISH WATCH is the existing unvalidated legacy hypothesis, NOT a trade order. '
+       'Validated action remains NO TRADE pending independent forward-performance evidence.</p>')
     heads=("Observed receipt","Legacy bias","PE wall / change","CE wall / change",
         "GEX scenario","Writing / seller exit","Futures read","Research watch")
     table='<div class="scroll"><table><thead><tr>'+''.join("<th>"+escape(h)+"</th>" for h in heads)+'</tr></thead><tbody>'
