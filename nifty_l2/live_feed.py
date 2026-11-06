@@ -64,8 +64,30 @@ def normalize_chain(response,expiry_id,*,observed_at):
       "exchange_oi_timestamp_verified":False,
       "legs":legs,"strike_coverage":len(legs)}
 
-def collect_once(*,transport,now,expiry_id,future_symbol,history_days=None):
-    """Injected transport; at most two broker market-data requests."""
+def discover_front_expiry(transport,*,now):
+    """Read actual broker expiry IDs; never derive contract expiry from a guessed date."""
+    response=transport("optionchain",params={"symbol":"NSE:NIFTY50-INDEX",
+        "strikecount":1,"timestamp":""})
+    if not isinstance(response,dict) or response.get("s")!="ok":
+        raise ValueError("FYERS expiry discovery rejected")
+    expiries=response.get("data",{}).get("expiryData",[])
+    if not isinstance(expiries,list):raise ValueError("Bad FYERS expiryData")
+    now_epoch=int(now.timestamp())
+    choices=[]
+    for item in expiries:
+        if not isinstance(item,dict):continue
+        value=item.get("expiry")
+        try:
+            epoch=int(value)
+        except (TypeError,ValueError):
+            continue
+        if epoch>=now_epoch and epoch<now_epoch+60*60*24*70:
+            choices.append((epoch,item.get("date")))
+    if not choices:raise ValueError("No verified future FYERS expiry")
+    return min(choices,key=lambda v:v[0])
+
+def collect_once(*,transport,now,expiry_id,future_symbol,history_days=None,expiry_date=None):
+    """Injected transport; exactly two broker market-data requests."""
     if now.tzinfo is None:raise ValueError("aware clock required")
     if not future_symbol.startswith("NSE:") or "FUT" not in future_symbol:
         raise ValueError("reviewed futures symbol required")
@@ -82,7 +104,7 @@ def collect_once(*,transport,now,expiry_id,future_symbol,history_days=None):
     future=normalize_completed_futures_1m(hist,symbol=future_symbol,retrieved_at=end)
     return {"request_start_utc":_utc(start),"request_end_utc":_utc(end),
       "receipt_utc":_utc(end),"expiry_id":str(expiry_id),
-      "expiry_date":None,"future_symbol":future_symbol,"options":options,
+      "expiry_date":expiry_date,"future_symbol":future_symbol,"options":options,
       "futures":future,"source":"FYERS_READONLY","orders_enabled":False}
 
 def store_once(db_path,packet):
@@ -122,12 +144,15 @@ def main(argv=None):
     p.add_argument("--live",action="store_true",help="Authorize FYERS market-data requests")
     p.add_argument("--once",action="store_true",help="One 2-request sample")
     p.add_argument("--every-seconds",type=int,default=180)
-    p.add_argument("--expiry-id",required=True,help="FYERS actual expiry epoch, discovered via chain")
+    p.add_argument("--expiry-id",help="FYERS actual expiry epoch, discovered via chain")
+    p.add_argument("--auto-expiry",action="store_true",help="Discover nearest broker expiry each sample (extra REST call)")
     p.add_argument("--future-symbol",required=True)
     p.add_argument("--db",type=Path,required=True)
     p.add_argument("--token-path",type=Path,default=fyers.TOKEN_PATH)
     args=p.parse_args(argv)
     if not args.live:p.error("--live required")
+    if not args.auto_expiry and not args.expiry_id:
+        p.error("Provide --expiry-id or --auto-expiry")
     if not 180<=args.every_seconds<=3600:
         p.error("Minimum 180-second sampling cadence")
     creds=load_token(args.token_path)
@@ -143,8 +168,10 @@ def main(argv=None):
             hours=session(local.date())
             if hours and hours[0]<=local<hours[1]:
                 try:
+                    eid,exp_date=(discover_front_expiry(transport,now=now)
+                       if args.auto_expiry else (args.expiry_id,None))
                     packet=collect_once(transport=transport,now=now,
-                      expiry_id=args.expiry_id,future_symbol=args.future_symbol)
+                      expiry_id=eid,future_symbol=args.future_symbol,expiry_date=exp_date)
                     store_once(path,packet)
                     print("FYERS_READONLY saved",packet["receipt_utc"],
                          packet["futures"]["status"],flush=True)
