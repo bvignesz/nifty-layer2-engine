@@ -67,3 +67,8 @@ $PY -m pytest -q tests/test_microstructure_terminal.py
 4. Develop conditional OI speed, wall cut, liquidity and futures quadrants on replayed and prospectively recorded data, with explicit warm-up and missing-data states.
 5. Prove OI quantity convention and dealer-sign scenarios, calibrate gamma separately, then add scenario-only GEX and its observed-window changes.
 6. Compare video-like alerts with forward outcomes only on leakage-safe walk-forward data, then independently review before enabling anything actionable.
+
+
+## Trading system v2 method (2026-11-06)
+
+The approved *research proposal* spanning NIFTY option buying and NSE swing selection is in [TRADING_METHOD_V2_OPTIONS_AND_SWING.md](TRADING_METHOD_V2_OPTIONS_AND_SWING.md). It adds option premium economics, spread/theta/IV scenario tests, breakout vs OI/GEX ablations, robust out-of-sample replay, Indian equity liquid-momentum baseline, risk sizing and a toolchain. This document is **not** permission to alter frozen original nine-check calculations or deploy automated order execution.
