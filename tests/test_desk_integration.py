@@ -67,6 +67,12 @@ def test_desk_api_uses_existing_auth_guard_and_readonly_database(tmp_path):
         assert data["status"]=="NO_DATA"
         assert not data["orders_enabled"]
         assert res.getheader("Cache-Control")=="no-store"
+        conn.request("GET","/api/v1/live-feed")
+        res=conn.getresponse()
+        feed=json.loads(res.read())
+        assert res.status==200
+        assert feed["status"]=="NO_FEED"
+        assert feed["orders_enabled"] is False
         conn.request("GET","/api/v1/desk?date=not-a-date")
         res=conn.getresponse()
         assert res.status==400
