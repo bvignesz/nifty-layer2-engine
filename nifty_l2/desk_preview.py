@@ -13,6 +13,7 @@ from urllib.parse import parse_qs,urlparse
 from .storage import IST
 from .desk_readmodel import desk_snapshot
 from .desk_pages import render_desk
+from .live_feed_view import live_readmodel,render_live_feed
 
 def make_handler(db_path):
     database=Path(db_path).expanduser().resolve()
@@ -29,8 +30,13 @@ def make_handler(db_path):
                 data=desk_snapshot(database.parent,day,
                     limit=query.get("limit",["40"])[0])
                 is_json=parsed.path=="/api/v1/desk"
-                body=(json.dumps(data,ensure_ascii=False,allow_nan=False)
-                    if is_json else render_desk(data)).encode("utf-8")
+                if is_json:
+                    body=json.dumps(data,ensure_ascii=False,allow_nan=False).encode("utf-8")
+                else:
+                    page=render_desk(data)
+                    page=page.replace('<div class="panel">',
+                        render_live_feed(live_readmodel(database.parent))+'<div class="panel">',1)
+                    body=page.encode("utf-8")
             except (ValueError,OverflowError):
                 self.send_error(400,"Bad date or limit");return
             self.send_response(200)
