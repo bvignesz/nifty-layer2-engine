@@ -42,6 +42,9 @@ def live_readmodel(directory,*,now=None,oi_unit=None,lot_size=None):
     now=now or datetime.now(timezone.utc)
     if now.tzinfo is None:raise ValueError("aware clock")
     path=Path(directory)/"market_feed.db"
+    isolated=Path(directory).parent/"live-runtime"/"market_feed.db"
+    if isolated.is_file():
+        path=isolated
     latest=latest_feed(path)
     base={"status":latest["status"],"observed_receipt":None,
       "freshness_seconds":None,"ce_wall":None,"pe_wall":None,
