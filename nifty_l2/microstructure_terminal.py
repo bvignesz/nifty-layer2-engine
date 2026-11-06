@@ -217,7 +217,7 @@ td:first-child,th:first-child{position:sticky;left:0;background:#13233a;z-index:
 .up{color:#47daac}.down{color:#ff8b95}.neutral{color:#f3c478}.time{color:#b5cffe}
 small{display:block;margin:10px 0;color:#9cacc5}
 nav{margin:12px 0}"""
-    header='<nav><a href="/">Home</a> · <a href="/research">Nine checks</a> · <a href="/validation">Validation</a></nav>'
+    header='<nav><a href="/">Home</a> · <a href="/desk">NIFTY Options Desk</a> · <a href="/swing">Indian Swing Engine</a> · <a href="/research">Nine checks</a> · <a href="/validation">Validation</a></nav>'
     explanation=('<p class="meta">One row per stored observation (nominal 3-minute collection), '
        'NOT a completed one-minute option candle. OI and volume changes require '
        'matching symbols and a 90–360 second receipt gap. Futures OI quadrant and '
