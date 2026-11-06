@@ -4,7 +4,7 @@ Never trains on legacy five unlabeled rows, random splits or unverified events.
 No live trading inference, no orders. Uses chronological day-level holdout with
 a full-day embargo, disables silently missing data, and saves only metrics.
 """
-from datetime import date
+from datetime import date,datetime,timezone
 import math
 
 FEATURES=("wall_cut_ce_pct","wall_cut_pe_pct","oi_speed_ce","oi_speed_pe",
@@ -25,8 +25,13 @@ def validate_training_rows(rows,*,min_rows=MIN_ROWS,min_sessions=MIN_SESSIONS):
         try:
             day=date.fromisoformat(row["session_date"])
             ts=row["observed_at_utc"]
-            if not isinstance(ts,str) or "T" not in ts:
+            observed=datetime.fromisoformat(ts.replace("Z","+00:00"))
+            completed=datetime.fromisoformat(
+                row["future_label_available_at_utc"].replace("Z","+00:00"))
+            if observed.tzinfo is None or completed.tzinfo is None:
                 return {"status":"INVALID_TIMESTAMP"}
+            if observed.astimezone(timezone.utc).date()!=day:
+                return {"status":"SESSION_DATE_TIMESTAMP_MISMATCH"}
             for col in FEATURES:
                 v=row[col]
                 if not isinstance(v,(int,float)) or isinstance(v,bool) or not math.isfinite(v):
@@ -36,7 +41,7 @@ def validate_training_rows(rows,*,min_rows=MIN_ROWS,min_sessions=MIN_SESSIONS):
                 return {"status":"INVALID_LABEL"}
             if row.get("source")!="VERIFIED_HISTORICAL_REPLAY":
                 return {"status":"UNVERIFIED_SOURCE"}
-            if row.get("future_label_available_at_utc",ts)<=ts:
+            if completed<=observed:
                 return {"status":"LOOKAHEAD_LABEL"}
         except (KeyError,TypeError,ValueError):
             return {"status":"INVALID_ROWS"}
