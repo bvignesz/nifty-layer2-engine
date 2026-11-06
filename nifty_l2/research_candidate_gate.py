@@ -23,7 +23,7 @@ DEFAULT_POLICY={
 def _valid(v,allow_zero=False):
     try:
         x=float(v)
-        return x if isfinite(x) and (x>=0 if allow_zero else x>0)
+        return isfinite(x) and (x>=0 if allow_zero else x>0)
     except (TypeError,ValueError,OverflowError):
         return False
 
