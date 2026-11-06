@@ -7,6 +7,7 @@ probable GEX scenario is explicitly conditional on raw OI unit assumptions.
 from datetime import datetime,timezone
 from html import escape
 from pathlib import Path
+import os
 import json,sqlite3
 from .live_feed import latest_feed
 from .futures_one_minute import futures_oi_quadrant
@@ -39,6 +40,13 @@ def signed_gamma_scenario(legs,future_price,*,oi_unit=None,lot_size=None):
        "dealer_inventory_observed":False,"research_only":True}
 
 def live_readmodel(directory,*,now=None,oi_unit=None,lot_size=None):
+    # Opt-in assumption only; never silently assert OI units or dealer inventory.
+    if oi_unit is None:
+        chosen=os.environ.get("NIFTY_RESEARCH_GEX_OI_UNIT","")
+        oi_unit=chosen if chosen in ("underlying_units","contracts") else None
+    if lot_size is None:
+        size=os.environ.get("NIFTY_RESEARCH_GEX_LOT_SIZE","")
+        lot_size=int(size) if size.isdecimal() and 1<=int(size)<=10000 else None
     now=now or datetime.now(timezone.utc)
     if now.tzinfo is None:raise ValueError("aware clock")
     path=Path(directory)/"market_feed.db"
