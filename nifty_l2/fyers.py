@@ -14,6 +14,7 @@ ENDPOINTS = {
     'optionchain': ('GET', 'https://api-t1.fyers.in/data/options-chain-v3'),
     'quotes': ('GET', 'https://api-t1.fyers.in/data/quotes'),
     'history': ('GET', 'https://api-t1.fyers.in/data/history'),
+    'futureschain': ('GET', 'https://api-t1.fyers.in/data/futures-chain'),
     'exchange': ('POST', 'https://api-t1.fyers.in/api/v3/validate-authcode'),
     'profile': ('GET', 'https://api-t1.fyers.in/api/v3/profile'),
     'quote': ('GET', 'https://api-t1.fyers.in/data/quotes?symbols=NSE%3ANIFTY50-INDEX'),
@@ -28,7 +29,7 @@ class NoRedirect(HTTPRedirectHandler):
 def request(operation, *, payload=None, credentials=None, params=None):
     method, url = ENDPOINTS[operation]
     if params is not None:
-        if operation not in ('optionchain', 'quotes', 'history'):
+        if operation not in ('optionchain', 'quotes', 'history', 'futureschain'):
             raise ValueError('Parameters are only supported for market-data reads')
         url += '?' + urlencode(params)
     # FYERS' edge rejects the default Python-urllib user agent before auth.
