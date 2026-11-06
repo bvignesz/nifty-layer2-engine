@@ -86,6 +86,28 @@ def discover_front_expiry(transport,*,now):
     if not choices:raise ValueError("No verified future FYERS expiry")
     return min(choices,key=lambda v:v[0])
 
+def discover_front_future(transport,*,now):
+    """Select actual nonexpired NIFTY futures contract from FYERS futures-chain."""
+    response=transport("futureschain",params={"symbol":"NSE:NIFTY50-INDEX"})
+    if not isinstance(response,dict) or response.get("s")!="ok":
+        raise ValueError("FYERS futures chain rejected")
+    records=response.get("data")
+    if not isinstance(records,list):raise ValueError("FYERS futures data unavailable")
+    now_epoch=int(now.timestamp())
+    candidates=[]
+    for item in records:
+        if not isinstance(item,dict):continue
+        sym=item.get("symbol")
+        exp=item.get("expiry")
+        if not isinstance(sym,str) or not sym.startswith("NSE:NIFTY") or not sym.endswith("FUT"):
+            continue
+        try:epoch=int(exp)
+        except (TypeError,ValueError):continue
+        if now_epoch<=epoch<=now_epoch+65*86400:
+            candidates.append((epoch,sym))
+    if not candidates:raise ValueError("No current NIFTY future from broker")
+    return min(candidates,key=lambda row:row[0])[1]
+
 def collect_once(*,transport,now,expiry_id,future_symbol,history_days=None,expiry_date=None):
     """Injected transport; exactly two broker market-data requests."""
     if now.tzinfo is None:raise ValueError("aware clock required")
@@ -146,13 +168,16 @@ def main(argv=None):
     p.add_argument("--every-seconds",type=int,default=180)
     p.add_argument("--expiry-id",help="FYERS actual expiry epoch, discovered via chain")
     p.add_argument("--auto-expiry",action="store_true",help="Discover nearest broker expiry each sample (extra REST call)")
-    p.add_argument("--future-symbol",required=True)
+    p.add_argument("--future-symbol")
+    p.add_argument("--auto-future",action="store_true",help="Discover nearest real NIFTY futures contract (extra REST call)")
     p.add_argument("--db",type=Path,required=True)
     p.add_argument("--token-path",type=Path,default=fyers.TOKEN_PATH)
     args=p.parse_args(argv)
     if not args.live:p.error("--live required")
     if not args.auto_expiry and not args.expiry_id:
         p.error("Provide --expiry-id or --auto-expiry")
+    if not args.auto_future and not args.future_symbol:
+        p.error("Provide --future-symbol or --auto-future")
     if not 180<=args.every_seconds<=3600:
         p.error("Minimum 180-second sampling cadence")
     creds=load_token(args.token_path)
@@ -170,8 +195,10 @@ def main(argv=None):
                 try:
                     eid,exp_date=(discover_front_expiry(transport,now=now)
                        if args.auto_expiry else (args.expiry_id,None))
+                    fsym=(discover_front_future(transport,now=now)
+                       if args.auto_future else args.future_symbol)
                     packet=collect_once(transport=transport,now=now,
-                      expiry_id=eid,future_symbol=args.future_symbol,expiry_date=exp_date)
+                      expiry_id=eid,future_symbol=fsym,expiry_date=exp_date)
                     store_once(path,packet)
                     print("FYERS_READONLY saved",packet["receipt_utc"],
                          packet["futures"]["status"],flush=True)
