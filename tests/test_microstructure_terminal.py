@@ -29,6 +29,8 @@ def test_microstructure_uses_real_same_contract_deltas_and_no_trade(tmp_path):
     data=read_rows(directory,"2026-11-05")
     assert data["status"]=="AVAILABLE"
     assert data["rows"][0]["ce_wall_delta"]["oi_delta"]==1300
+    assert data["rows"][0]["ce_wall_cut_pct"]== -2.0
+    assert data["rows"][0]["futures_observation_quadrant"]=="NEUTRAL"
     assert data["rows"][0]["ce_wall_delta"]["volume_increment"]==30
     assert data["rows"][0]["ce_observed_subset"]["oi_delta"]==1300
     assert data["rows"][0]["ce_observed_subset"]["volume_increment"]==30
@@ -39,7 +41,7 @@ def test_microstructure_uses_real_same_contract_deltas_and_no_trade(tmp_path):
     assert data["rows"][1]["ce_wall_delta"]["oi_delta"] is None
     html=render(data)
     assert "NO TRADE" in html
-    assert "BULL" in html
+    assert "BULLISH WATCH" in html
     assert "NOT a completed one-minute" in html
 
 def test_microstructure_rejects_noncomparable_contract_or_volume_reset(tmp_path):

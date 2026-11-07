@@ -1,0 +1,26 @@
+[Unit]
+Description=NIFTY isolated FYERS read-only market research feed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/nifty-platform-validation
+Environment=PYTHONPATH=/home/ubuntu/nifty-platform-validation
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/home/ubuntu/nifty-layer2-engine/.venv/bin/python -m nifty_l2.live_feed --live --auto-expiry --auto-future --db /home/ubuntu/.config/nifty-layer2/live-runtime/market_feed.db --token-path /home/ubuntu/.config/nifty-layer2/fyers-token.json --every-seconds 180
+Restart=on-failure
+RestartSec=20
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.config/nifty-layer2/live-runtime
+UMask=0077
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
