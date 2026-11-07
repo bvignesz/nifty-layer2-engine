@@ -9,6 +9,7 @@ import sqlite3
 from .microstructure_terminal import read_rows as microstructure_rows
 from .research_alerts import format_research_alert
 from .trade_journal import journal_summary
+from .quality_filter import quality_status
 from .storage import IST
 
 def _connection(directory):
@@ -57,6 +58,7 @@ def desk_snapshot(directory,day,*,limit=40):
             "trade_permission":"MANUAL_REVIEW_ONLY",
             "alert_preview":format_research_alert(entry)})
     journal=journal_summary(Path(directory)/"trade_journal.db")
+    memory=quality_status(Path(directory).parent/"market-memory"/"market_memory.db")
     flags={
         "live_option_exchange_timestamps_verified":counts["option_exchange_timestamp_count"]>0,
         "completed_futures_bars_in_database":counts["futures_bars"]>0,
@@ -67,7 +69,7 @@ def desk_snapshot(directory,day,*,limit=40):
         "telegram_delivery_configured":False,
         "orders_enabled":False}
     return {"version":2,"date_ist":day,"status":data["status"],
-        "readiness":flags,"counts":counts,"journal":journal,"rows":rows,
+        "readiness":flags,"counts":counts,"journal":journal,"market_memory":memory,"rows":rows,
         "signal_policy":"LEGACY_HYPOTHESIS / MANUAL_ONLY",
         "observation_semantics":"FYERS snapshot receipts; NOT synchronized 1m option candles",
         "research_only":True,"orders_enabled":False}
