@@ -162,8 +162,8 @@ article{margin-bottom:10px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:
 small,p.muted{color:#a5bad5}input{background:#152944;color:white;border:1px solid #405d7a;padding:9px}
 @media(max-width:700px){.grid{grid-template-columns:1fr}}"""
     ident=e(data.get("selected_id") or "")
-    search='<form action="/chat-archive" method="get"><input type="hidden" name="id" value="'+ident+'">'+
-       '<input name="q" maxlength="128" placeholder="Search selected chat"> <button>Find</button></form>'
+    search=('<form action="/chat-archive" method="get"><input type="hidden" name="id" value="'+ident+'">'+
+       '<input name="q" maxlength="128" placeholder="Search selected chat"> <button>Find</button></form>')
     return ('<!doctype html><html lang="en"><meta charset="utf-8">'+
       '<meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+
       '</style><main>'+nav+'<h1>PROJECT CHAT ARCHIVE</h1>'+
