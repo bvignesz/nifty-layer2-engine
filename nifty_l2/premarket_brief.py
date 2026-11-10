@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import json
 from .storage import IST
+from .market_calendar import session
 ALLOWED_HOSTS=("rbi.org.in","www.rbi.org.in","nseindia.com","www.nseindia.com",
  "nsearchives.nseindia.com","niftyindices.com","www.niftyindices.com",
  "pib.gov.in","www.pib.gov.in")
@@ -76,6 +77,26 @@ def validate_brief(data,*,now=None):
       "bias":"UNVERIFIED",  # no automatic headline sentiment inference
       "research_only":True,"orders_enabled":False}
 
+def _calendar_overlay(result,now):
+    """Add independently checked exchange holiday context without fabricating other inputs."""
+    try:
+        trading=session(now.astimezone(IST).date())
+    except ValueError:
+        return result
+    if trading is None:
+        updated=[]
+        for item in result["checks"]:
+            if item["key"]=="MARKET_HOLIDAY":
+                updated.append({**item,"status":"EVENT_RISK",
+                    "note":"NSE F&O closed today per verified 2026 exchange holiday calendar"})
+            else:updated.append(item)
+        result={**result,"checks":updated,"event_risk":True,
+                "market_session":"EXCHANGE_CLOSED",
+                "complete":False}
+    else:
+        result={**result,"market_session":"SCHEDULED_SESSION"}
+    return result
+
 def read_brief(directory,*,now=None):
     now=now or datetime.now(timezone.utc)
     path=Path(directory)/"premarket-brief.json"
@@ -83,9 +104,9 @@ def read_brief(directory,*,now=None):
       "checks":[{"key":k,"label":label,"status":"UNAVAILABLE","note":""}
                 for k,label in CHECKLIST],"news":[],"complete":False,
       "event_risk":False,"bias":"UNVERIFIED","orders_enabled":False}
-    if not path.is_file():return unavailable
+    if not path.is_file():return _calendar_overlay(unavailable,now)
     try:
-        if path.stat().st_size>128*1024:return {**unavailable,"status":"INVALID_OR_TOO_LARGE"}
-        return validate_brief(json.loads(path.read_text(encoding="utf-8")),now=now)
+        if path.stat().st_size>128*1024:return _calendar_overlay({**unavailable,"status":"INVALID_OR_TOO_LARGE"},now)
+        return _calendar_overlay(validate_brief(json.loads(path.read_text(encoding="utf-8")),now=now),now)
     except (ValueError,KeyError,TypeError,OSError):
-        return {**unavailable,"status":"STALE_OR_INVALID_BRIEF"}
+        return _calendar_overlay({**unavailable,"status":"STALE_OR_INVALID_BRIEF"},now)
