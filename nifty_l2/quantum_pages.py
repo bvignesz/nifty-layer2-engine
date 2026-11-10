@@ -44,6 +44,9 @@ def quantum_snapshot(directory,*,now=None):
         "reasons":["PREMARKET_DATA_NOT_AUTHENTICATED"]}
     preopen_input=_read(directory/"preopen-signals.json",max_bytes=16000)
     preopen=evaluate_preopen(preopen_input,now=now,event_risk=brief["event_risk"])
+    if preopen["status"]=="EXCHANGE_CLOSED":
+        pm={"status":"EXCHANGE_CLOSED","bias":"IGNORE",
+            "reasons":["NSE_SESSION_HOLIDAY_OR_WEEKEND"]}
     if (preopen["status"]=="PREOPEN_RESEARCH_CONTEXT" and
         preopen["bias"] in ("BULL","BEAR") and brief["complete"]):
         pm={"status":"VERIFIED","bias":preopen["bias"],"reasons":[],
