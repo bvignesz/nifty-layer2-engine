@@ -1,0 +1,13 @@
+[Unit]
+Description=Official premarket headlines (no trading actions)
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 08:15:00 Asia/Kolkata
+OnCalendar=Mon..Fri *-*-* 09:00:00 Asia/Kolkata
+OnCalendar=Mon..Fri *-*-* 11:00:00 Asia/Kolkata
+RandomizedDelaySec=30
+Persistent=true
+Unit=nifty-premarket-news.service
+
+[Install]
+WantedBy=timers.target
