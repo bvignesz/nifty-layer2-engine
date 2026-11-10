@@ -29,6 +29,7 @@ from .live_feed_view import live_readmodel, render_live_feed
 from .swing_pages import swing_snapshot, render_swing
 from .terminal_ui import history_html as strike_history_html
 from .home_dashboard import render_home
+from .quantum_pages import quantum_snapshot, render_quantum
 import sqlite3
 
 
@@ -198,7 +199,12 @@ def handler_for(app):
             if not self.authorized():
                 return
             path = urlparse(self.path).path
-            if path == '/settings':
+            if path == '/quantum':
+                self.respond(200,render_quantum(quantum_snapshot(app.runner.directory)))
+            elif path == '/api/v1/quantum':
+                self.respond(200,json.dumps(quantum_snapshot(app.runner.directory),
+                    allow_nan=False),content_type='application/json; charset=utf-8')
+            elif path == '/settings':
                 self.respond(200,app.settings_page())
             elif path == '/strike-terminal':
                 try:
