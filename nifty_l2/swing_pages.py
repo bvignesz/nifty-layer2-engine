@@ -71,7 +71,7 @@ button,select{background:#1b344e;border:1px solid #496582;color:#eaf2ff;border-r
       '<meta name="viewport" content="width=device-width,initial-scale=1">'
       '<title>PRO TRADER ACADEMY · INDIAN SWING ENGINE</title><style>'+css+
       '</style><main><nav><a href="/desk">NIFTY Options Desk</a>'
-      '<a href="/swing">Indian Swing Engine</a><a href="/eod">Legacy EOD Scanner</a>'
+      '<a href="/swing">Indian Swing Engine</a><a href="/quantum">Quantum Alignment</a><a href="/eod">Legacy EOD Archive</a>'
       '<a href="/validation">Validation</a></nav>'
       '<h1>PRO TRADER ACADEMY · INDIAN SWING ENGINE</h1>'
       '<p class="meta">NIFTY 500 research · Relative strength · EMA pullback · '
