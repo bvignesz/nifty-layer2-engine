@@ -72,4 +72,24 @@ def render_home(app,message=""):
       '<section class="card"><h2>2 · Run nine-check script</h2>'
       '<p><span class="pill">'+_e(run.get("status","IDLE"))+'</span> · '+
       _e(run.get("message",""))+'</p>'+
-      button("/run/stop","Stop run") if False else '')
+      (button("/run/stop","Stop run") if running else button("/run","Run script once"))+
+      '<p class="muted">Last intraday nine-check verdict (UNVALIDATED): '+verdict+
+      '. Daily alignment and Greeks are assessed separately in Quantum Alignment.</p>'
+      '</section></div>'
+      '<section class="card"><h2>Pre-market checklist · '+
+      _e(brief["date_ist"])+'</h2>'
+      '<p><span class="pill">'+_e(brief["status"])+'</span> '
+      ' · Overall directional status: UNVERIFIED until authenticated source inputs agree. '
+      'The checklist is not a buy/sell signal.</p>'
+      '<div style="overflow:auto"><table><thead><tr><th>CHECK</th><th>STATE</th>'
+      '<th>OBSERVATION</th></tr></thead><tbody>'+checks+'</tbody></table></div></section>'
+      '<section class="card"><h2>News & macro events · source-backed</h2>'
+      '<p class="muted">From an imported time-stamped official-source brief; '
+      'no speculative AI headline sentiment or undocumented news feed.</p>'+
+      ('<ul>'+headlines+'</ul>' if headlines else
+       '<p class="warn">No verified current news loaded. '
+       'See official <a href="https://www.nseindia.com/static/rss-feed">NSE RSS</a> '
+       'and <a href="https://www.rbi.org.in/Scripts/rss.aspx">RBI RSS</a>. '
+       'Import a verified premarket brief to display dated headlines.</p>')+
+      '</section><footer>Trading remains manual. Incomplete daily, Greek or intraday '
+      'evidence always produces IGNORE.</footer></main></body></html>')
