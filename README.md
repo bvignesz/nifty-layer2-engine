@@ -1,3 +1,13 @@
+# Pro Trader Academy — Research Platform (development branch)
+
+**Architecture update (10 Nov 2026):** The homepage `/` is now an operator control + premarket and official-source news page, **not** a duplicate strike-OI table. The original strike table is retained at `/strike-terminal`. Dedicated views: `/desk` (options), `/swing` (cash equity), `/quantum` (five-stage multi-timeframe research), `/research` (original nine checks) and `/validation` (audit). See [architecture & non-destructive cleanup plan](docs/HOME_PREMARKET_QUANTUM_ARCHITECTURE.md).
+
+The previous intraday nine checks **are not equivalent** to nine factors on completed daily candles. `nifty_l2/daily_alignment.py` implements a separate nine-factor **previous-session** context. `nifty_l2/daily_fyers_collector.py` can fetch completed FYERS daily NIFTY + independently verified benchmark history via the official read-only History endpoint. Preopen context requires externally validated sources. Missing inputs, source timing or conflicting directions **always mean IGNORE**. No automatic orders, no guaranteed trading edge.
+
+**This is a development branch, not confirmation that the newest interface is running on AWS.** Existing collectors, private credentials, historical data and original checks are intentionally preserved. The earlier deployment notes below describe older released versions and may differ from this branch.
+
+---
+
 # NIFTY Layer 2 — research-only SQLite migration
 
 Phase 1 audit and Phase 2 migration tooling are implemented. Historical migration awaits original exports; market-hours research sampling and the web dashboard are enabled. Validated production signals, OpenBB deployment and ML training remain pending.

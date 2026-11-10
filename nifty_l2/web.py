@@ -23,6 +23,14 @@ from .terminal_ui import UI_CSS, history_html
 from .research_readmodel import research_history, expiry_matrix, readiness
 from .research_pages import render as render_research_page
 from .microstructure_terminal import read_rows as microstructure_rows, render as microstructure_page
+from .desk_readmodel import desk_snapshot
+from .desk_pages import render_desk
+from .live_feed_view import live_readmodel, render_live_feed
+from .swing_pages import swing_snapshot, render_swing
+from .chat_archive import read_chat_archive, render_chat_archive
+from .terminal_ui import history_html as strike_history_html
+from .home_dashboard import render_home
+from .quantum_pages import quantum_snapshot, render_quantum
 import sqlite3
 
 
@@ -142,71 +150,24 @@ class App:
         self.token_path.unlink(missing_ok=True)
 
     def page(self, message='', params=None):
-        saved = self.token_path.exists()
-        status = self.runner.status()
-        running = status.get('status') == 'RUNNING'
-        try:
-            history = history_html(snapshots(self.runner.directory, params or {}))
-        except (ValueError, OverflowError, IndexError):
-            history = '<article><p>Invalid history filter. Use an ISO date and a numeric strike and page.</p><a href="/">Reset filters</a></article>'
-        csrf = f'<input type="hidden" name="csrf" value="{self.csrf}">'
-        def form(action, label):
-            target = ' target="_blank"' if action == '/connect' and self.origin.startswith('http:') else ''
-            return f'<form method="post" action="{action}"{target}>{csrf}<button>{label}</button></form>'
-        result_html = '<p>No completed runs yet. Connect FYERS, then run the script.</p>'
-        try:
-            result = json.loads((self.runner.directory / 'result.json').read_text())
-            state = result['state']
-            meta = state.get('meta', {})
-            completed = datetime.fromisoformat(result['observed_at']).astimezone(IST)
-            result_html = '<p class="tag">Last completed run · ' + completed.strftime('%d %b %Y, %I:%M:%S %p IST') + '</p>'
-            result_html += '<p>Research output · ' + escape(str(state.get('final_verdict', 'Unavailable'))) + '</p>'
-            result_html += '<p class="muted">This is the original script output. Data freshness and strategy validity have not been established. Validated classification remains No Trade.</p>'
-            result_html += '<div class="metrics">' + ''.join(
-                f'<div><small>{escape(label)}</small><strong>{escape(str(meta.get(key, "Unavailable")))}</strong></div>'
-                for key, label in [('spot', 'NIFTY SPOT'), ('bull_score', 'BULL CHECKS'), ('bear_score', 'BEAR CHECKS'),
-                                   ('fut_close', 'FUTURES'), ('put_wall', 'PUT WALL'), ('call_wall', 'CALL WALL'),
-                                   ('gex', 'CHAIN GEX · MODEL SCENARIO'), ('seller_lead', 'ENGINE SELLER READ')]) + '</div>'
-            result_html += '<div class="table"><table><thead><tr><th>Check</th><th>Bull</th><th>Bear</th></tr></thead><tbody>'
-            for row in state.get('scorecard', []):
-                result_html += '<tr>' + ''.join('<td>' + escape(str(row.get(k, 'Unavailable'))) + '</td>' for k in ('Check', 'Bull_Status', 'Bear_Status')) + '</tr>'
-            result_html += '</tbody></table></div><details><summary>Full script output</summary><pre>' + escape(json.dumps(state, indent=2)) + '</pre></details>'
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
-        manual = ('<p class="muted">Login opens in a new tab. After FYERS redirects, copy its full final address and paste it here.</p>'
-                  '<form method="post" action="/oauth/callback">' + csrf +
-                  '<label for="callback_url">Full FYERS redirect URL</label><input id="callback_url" name="callback_url" type="password" required autocomplete="off"><button>Complete connection</button></form>') if self.origin.startswith('http:') else ''
-        automation = '<article><h2>Automatic collection</h2><p>Not installed.</p></article>'
-        try:
-            collector = json.loads((self.runner.directory / 'collector-status.json').read_text())
-            updated = datetime.fromisoformat(collector['updated_at'])
-            fresh = (datetime.now(timezone.utc) - updated).total_seconds() < 30
-            automation = '<article><h2>Automatic collection · ' + escape(collector['status'] if fresh else 'OFFLINE') + '</h2><p>'
-            automation += escape(collector['message'] if fresh else 'Collector heartbeat is stale. Check the background service.') + '</p>'
-            automation += '<p>Every 3 minutes · regular session 09:15–15:40 IST · skips exchange holidays. Runs even when this page is closed.</p>'
-            if collector.get('next_run'):
-                upcoming = datetime.fromisoformat(collector['next_run']).astimezone(IST)
-                automation += '<p>Next run: ' + upcoming.strftime('%d %b %Y, %I:%M %p IST') + '</p>'
-            automation += form('/automation/resume' if collector['status'] == 'PAUSED' else '/automation/pause',
-                               'Resume automatic collection' if collector['status'] == 'PAUSED' else 'Pause automatic collection')
-            automation += '<p class="muted">Session calendar verified through 31 Dec 2026. Special session on 8 Nov: 14:20–15:40 IST. Each run checks FYERS authentication; reconnect if it expires.</p>'
-            database = self.runner.directory / 'research.db'
-            if database.exists():
-                with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=5) as conn:
-                    count = conn.execute('SELECT count(*) FROM signals').fetchone()[0]
-                    rows = conn.execute('SELECT coalesce(started_at_utc,scheduled_at_utc), trigger, status, message FROM run_log ORDER BY coalesce(started_at_utc,scheduled_at_utc) DESC LIMIT 12').fetchall()
-                automation += '<p>Database: ' + str(count) + ' saved research runs.</p><details><summary>Recent execution log</summary><table><thead><tr><th>Time (IST)</th><th>Run</th><th>Status</th><th>Detail</th></tr></thead><tbody>'
-                for when, trigger, run_status, detail in rows:
-                    shown = datetime.fromisoformat(when.replace('Z', '+00:00')).astimezone(IST).strftime('%d %b %H:%M:%S')
-                    automation += '<tr>' + ''.join('<td>' + escape(str(value)) + '</td>' for value in (shown, trigger, run_status, detail)) + '</tr>'
-                automation += '</tbody></table></details>'
-            automation += '</article>'
-        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
-            pass
-        refresh = '<meta http-equiv="refresh" content="5;url=/">' if running else ''
-        return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">''' + refresh + '''<title>Pro Trader Academy · NIFTY Research Terminal</title><style>''' + CSS + UI_CSS + '''</style><script defer src="/terminal.js"></script><main><header><div class="brand"><span class="logo">PT</span><div><b>PRO TRADER ACADEMY</b><small>NIFTY · STRIKE OI &amp; GEX RESEARCH TERMINAL</small></div></div><span class="tag">STORED RESEARCH · 3 MIN COLLECTION</span></header><nav class="research-nav"><a href="/microstructure">Microstructure terminal</a> · <a href="/research">Nine-check history</a> · <a href="/expiries">Multi-expiry</a> · <a href="/eod">EOD scanner</a> · <a href="/validation">Validation</a></nav><h1>NIFTY market structure</h1><p>Option snapshots · nine-check engine · database history.</p>''' + (
-            f'<div class="notice" role="status">{escape(message)}</div>' if message else '') + history + f'''
-<div class="grid"><article><h2>1 / Connect FYERS</h2><p>{'FYERS login saved · checked on every run' if saved else 'Not connected'}</p>''' + form('/connect', 'Connect FYERS') + (form('/quote', 'Verify & fetch quote') if saved else '') + manual + '''<p class="muted">Your account login and OTP stay on FYERS.</p></article><article><h2>2 / Run your script</h2><p>''' + escape(status.get('status', 'IDLE')) + '</p><p class="muted">' + escape(status.get('message', '')) + '</p>' + (form('/run/stop', 'Stop run') if running else form('/run', 'Run script once')) + '''<p class="muted">Manual run of the nine-check engine. Automatic collection runs separately during market hours. Refreshes every 5 seconds while a run is active.</p></article></div><article><h2>Research summary · latest completed run</h2>''' + result_html + '''<p><a href="/">Refresh status</a></p></article>''' + automation + '''<article><details><summary>FYERS app settings</summary><p>Register this exact redirect URL in your FYERS app:</p><code>''' + escape(self.callback) + '''</code><p class="muted">''' + ('App credentials are configured. Saving new credentials disconnects the previous account.' if self.client_id and self.secret else 'Enter fresh app credentials below. They are saved privately on the server.') + '''</p><form method="post" action="/settings">''' + csrf + '''<label for="client_id">FYERS App ID</label><input id="client_id" name="client_id" required maxlength="128" autocomplete="off"><label for="secret">FYERS App Secret</label><input id="secret" name="secret" type="password" required maxlength="512" autocomplete="new-password"><button>Save app settings''' + (' &amp; connect FYERS' if self.origin.startswith('https:') else '') + '''</button></form></details></article><footer>Pro Trader Academy · Research only · No order placement · Stored observations and model estimates; live signal validation remains pending.</footer></main></html>'''
+        from .home_dashboard import render_home
+        return render_home(self, message)
+
+    def settings_page(self):
+        csrf='<input type="hidden" name="csrf" value="'+escape(self.csrf,quote=True)+'">'
+        return ('<!doctype html><html lang="en"><meta charset="utf-8">'
+          '<meta name="viewport" content="width=device-width,initial-scale=1">'
+          '<title>FYERS Settings</title><style>body{background:#09111f;color:#d8e7f7;'
+          'font:14px system-ui;margin:30px auto;max-width:650px}a{color:#93c5fd}'
+          'input{width:100%;box-sizing:border-box;margin:7px 0 16px;padding:10px}'
+          'button{padding:11px;background:#2563eb;color:white;border:0;border-radius:6px}'
+          '</style><a href="/">← Home</a><h1>FYERS App Settings</h1>'
+          '<p>Registered redirect: <code>'+escape(self.callback)+'</code></p>'
+          '<form method="post" action="/settings">'+csrf+
+          '<label>App ID<input name="client_id" required maxlength="128"></label>'
+          '<label>App Secret<input type="password" name="secret" required maxlength="512"></label>'
+          '<button>Save FYERS settings</button></form>'
+          '<p>Saving settings invalidates the previous token. Credentials are not displayed.</p>')
 
 
 def handler_for(app):
@@ -239,7 +200,50 @@ def handler_for(app):
             if not self.authorized():
                 return
             path = urlparse(self.path).path
-            if path == '/microstructure':
+            if path == '/chat-archive':
+                try:
+                    q=parse_qs(urlparse(self.path).query)
+                    data=read_chat_archive(app.runner.directory/"chat_archive.db",
+                      conversation_id=q.get("id",[None])[0],
+                      query=q.get("q",[""])[0])
+                    self.respond(200,render_chat_archive(data))
+                except (ValueError,OverflowError,sqlite3.Error):
+                    self.respond(400,"Invalid chat archive request",
+                      content_type="text/plain; charset=utf-8")
+            elif path == '/quantum':
+                self.respond(200,render_quantum(quantum_snapshot(app.runner.directory)))
+            elif path == '/api/v1/quantum':
+                self.respond(200,json.dumps(quantum_snapshot(app.runner.directory),
+                    allow_nan=False),content_type='application/json; charset=utf-8')
+            elif path == '/settings':
+                self.respond(200,app.settings_page())
+            elif path == '/strike-terminal':
+                try:
+                    data=snapshots(app.runner.directory,parse_qs(urlparse(self.path).query))
+                    content=strike_history_html(data).replace('action="/" method="get"','action="/strike-terminal" method="get"')
+                    html='<html><meta charset="utf-8"><title>Stored Strike Snapshots</title><style>'+CSS+UI_CSS+'</style><script defer src="/terminal.js"></script><main><p><a href="/">Home</a> · <a href="/desk">Options Desk</a></p>'+content+'</main></html>'
+                    self.respond(200,html)
+                except (ValueError,OverflowError,IndexError,sqlite3.Error):
+                    self.respond(400,'Invalid snapshot filters',content_type='text/plain; charset=utf-8')
+            elif path == '/swing':
+                try:
+                    q=parse_qs(urlparse(self.path).query)
+                    payload=swing_snapshot(app.runner.directory,track=q.get('track',['ALL'])[0])
+                    self.respond(200,render_swing(payload))
+                except (ValueError,OverflowError,OSError):
+                    self.respond(400,'Invalid swing filter',content_type='text/plain; charset=utf-8')
+            elif path == '/desk':
+                try:
+                    params=parse_qs(urlparse(self.path).query)
+                    day=params.get('date',[datetime.now(IST).date().isoformat()])[0]
+                    desk=desk_snapshot(app.runner.directory,day)
+                    live=live_readmodel(app.runner.directory)
+                    page=render_desk(desk)
+                    page=page.replace('<div class="panel">',render_live_feed(live)+'<div class="panel">',1)
+                    self.respond(200,page)
+                except (ValueError, OverflowError, sqlite3.Error):
+                    self.respond(400,'Invalid desk date',content_type='text/plain; charset=utf-8')
+            elif path == '/microstructure':
                 try:
                     params=parse_qs(urlparse(self.path).query)
                     day=params.get('date',[datetime.now(IST).date().isoformat()])[0]
@@ -251,11 +255,17 @@ def handler_for(app):
                     self.respond(200, render_research_page(app.runner.directory, path.lstrip('/'), parse_qs(urlparse(self.path).query)))
                 except (ValueError, OverflowError, sqlite3.Error):
                     self.respond(400, 'Invalid research filter', content_type='text/plain; charset=utf-8')
-            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness','/api/v1/microstructure'):
+            elif path in ('/api/v1/research','/api/v1/expiries','/api/v1/readiness','/api/v1/microstructure','/api/v1/desk','/api/v1/live-feed','/api/v1/swing'):
                 try:
                     q = parse_qs(urlparse(self.path).query)
                     day = q.get('date', [datetime.now(IST).date().isoformat()])[0]
-                    if path == '/api/v1/microstructure':
+                    if path == '/api/v1/swing':
+                        payload = swing_snapshot(app.runner.directory,track=q.get('track',['ALL'])[0])
+                    elif path == '/api/v1/live-feed':
+                        payload = live_readmodel(app.runner.directory)
+                    elif path == '/api/v1/desk':
+                        payload = desk_snapshot(app.runner.directory,day,limit=q.get('limit',['40'])[0])
+                    elif path == '/api/v1/microstructure':
                         payload = microstructure_rows(app.runner.directory,day,q.get('limit',['40'])[0])
                     elif path == '/api/v1/research':
                         payload = research_history(app.runner.directory, day, q.get('limit', ['40'])[0])
