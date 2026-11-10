@@ -73,6 +73,7 @@ def render_home(app,message=""):
       '<a href="/swing">Swing Trading</a><a href="/quantum">Quantum Alignment</a>'
       '<a href="/microstructure">Microstructure</a><a href="/research">Nine Checks</a>'
       '<a href="/strike-terminal">Strike Snapshot Archive</a>'
+      '<a href="/chat-archive">Project Chats</a>'+
       '<a href="/settings">Settings</a></nav>'+notice+
       '<div class="grid"><section class="card"><h2>1 · Connect FYERS</h2>'
       '<p><span class="pill">'+("TOKEN SAVED · NOT REVERIFIED" if saved else "NOT CONNECTED")+'</span></p>'+
