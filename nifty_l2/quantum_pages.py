@@ -15,6 +15,7 @@ import json
 from .storage import IST
 from .premarket_brief import read_brief
 from .premarket_regime import classify_regime
+from .preopen_context import evaluate_preopen
 from .daily_alignment import evaluate_daily,alignment_gate
 from .live_feed_view import live_readmodel
 
@@ -41,6 +42,12 @@ def quantum_snapshot(directory,*,now=None):
             daily["status"]="INVALID_DAILY_CONTEXT"
     pm={"status":"UNVERIFIED","bias":"UNVERIFIED",
         "reasons":["PREMARKET_DATA_NOT_AUTHENTICATED"]}
+    preopen_input=_read(directory/"preopen-signals.json",max_bytes=16000)
+    preopen=evaluate_preopen(preopen_input,now=now,event_risk=brief["event_risk"])
+    if (preopen["status"]=="PREOPEN_RESEARCH_CONTEXT" and
+        preopen["bias"] in ("BULL","BEAR") and brief["complete"]):
+        pm={"status":"VERIFIED","bias":preopen["bias"],"reasons":[],
+            "method":"HEURISTIC_PREOPEN"}
     market=_read(directory/"market-regime.json",max_bytes=16000)
     if isinstance(market,dict) and market.get("date_ist")==day:
         try:
@@ -76,7 +83,8 @@ def quantum_snapshot(directory,*,now=None):
     decision=alignment_gate(premarket=pm,daily=daily,
        intraday=intraday,greeks=greeks)
     return {"status":"RESEARCH_ONLY","date_ist":day,"premarket":pm,
-      "premarket_checklist":brief["checks"],"news_count":len(brief["news"]),
+      "premarket_checklist":brief["checks"],"preopen":preopen,
+      "news_count":len(brief["news"]),
       "daily":daily,"intraday":intraday,"greeks":greeks,
       "feed_freshness_seconds":feed["freshness_seconds"],
       "decision":decision,
