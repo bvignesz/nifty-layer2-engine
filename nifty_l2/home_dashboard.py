@@ -7,6 +7,8 @@ from html import escape
 from datetime import datetime
 import json
 from .premarket_brief import read_brief
+from .preopen_context import evaluate_preopen
+from datetime import timezone
 from .storage import IST
 
 CSS="""body{margin:0;background:#09111f;color:#e0edfc;font:14px system-ui}
@@ -30,6 +32,13 @@ def render_home(app,message=""):
     run=app.runner.status()
     running=run.get("status")=="RUNNING"
     brief=read_brief(app.runner.directory)
+    try:
+        preopen=json.loads((app.runner.directory/"preopen-signals.json").read_text())
+    except (ValueError,OSError):
+        preopen=None
+    market=evaluate_preopen(preopen,now=datetime.now(timezone.utc),
+        event_risk=brief["event_risk"])
+    preopen_bias=(market.get("bias","IGNORE") if brief["complete"] else "UNVERIFIED")
     csrf='<input type="hidden" name="csrf" value="'+_e(app.csrf)+'">'
     def button(action,label):
         extra=' target="_blank"' if action=="/connect" and app.origin.startswith("http:") else ""
@@ -80,7 +89,9 @@ def render_home(app,message=""):
       '<section class="card"><h2>Pre-market checklist · '+
       _e(brief["date_ist"])+'</h2>'
       '<p><span class="pill">'+_e(brief["status"])+'</span> '
-      ' · Overall directional status: UNVERIFIED until authenticated source inputs agree. '
+      ' · Pre-open research context: '+_e(preopen_bias)+
+      ' ('+_e(market.get("status","UNVERIFIED"))+'). '
+      'Directional confirmation requires independently verified inputs. '
       'The checklist is not a buy/sell signal.</p>'
       '<div style="overflow:auto"><table><thead><tr><th>CHECK</th><th>STATE</th>'
       '<th>OBSERVATION</th></tr></thead><tbody>'+checks+'</tbody></table></div></section>'
