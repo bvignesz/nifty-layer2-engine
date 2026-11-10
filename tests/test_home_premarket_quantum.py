@@ -13,12 +13,17 @@ from nifty_l2.web import App,handler_for
 NOW=datetime(2026,11,10,3,0,tzinfo=timezone.utc) # 08:30 IST
 def history():
     from datetime import date
-    start=datetime(2025,9,1,tzinfo=timezone.utc)
+    end=date(2026,11,9)
+    days=[]
+    d=end
+    while len(days)<230:
+        if d.weekday()<5:
+            days.append(d.isoformat())
+        d-=timedelta(days=1)
     rows=[]
-    for i in range(230):
-        d=(start+timedelta(days=i)).date().isoformat()
+    for i,day in enumerate(reversed(days)):
         px=20000+i*5
-        rows.append({"date":d,"open":px-3,"high":px+7,"low":px-6,
+        rows.append({"date":day,"open":px-3,"high":px+7,"low":px-6,
             "close":px,"volume":1000000+i,
             "bar_status":"COMPLETED","source":"VERIFIED_EOD"})
     return rows
@@ -32,6 +37,8 @@ def test_daily_nine_context_strict_no_current_day_lookahead():
     assert model["bias"] in ("BULL","BEAR","MIXED")
     with pytest.raises(ValueError):
         evaluate_daily([*x,dict(x[-1],date=today)],x,asof=today)
+    with pytest.raises(ValueError,match="last completed"):
+        evaluate_daily(x[:-1],x[:-1],asof=today)
     with pytest.raises(ValueError):
         evaluate_daily(x,[*x[:-1]],asof=today)
 
