@@ -52,6 +52,8 @@ def evaluate_daily(bars,benchmark,*,asof):
             raise ValueError("daily session calendar not verified") from None
     if expected is None or base[-1][0]!=expected:
         raise ValueError("daily data does not end on last completed exchange session")
+    if [r[0] for r in base[-21:]] != [r[0] for r in bench[-21:]]:
+        raise ValueError("daily benchmark sessions do not align")
     close=[r[4] for r in base]
     benchclose=[r[4] for r in bench]
     e10=ema(close,10)
@@ -63,14 +65,22 @@ def evaluate_daily(bars,benchmark,*,asof):
     # Larry A/D computed on verified source bars by existing formula.
     sf=swing_features([{"date":str(d),"open":o,"high":h,"low":l,
                         "close":c,"volume":v} for d,o,h,l,c,v in base])
-    flags=[
-      close[-1]>e10,e10>e30,close[-1]>sma200,e10>lag_e10,
-      close[-1]>mid20,rs20>0,sf["ad_change_5"]>0,
-      close[-1]>close[-2],close[-1]>base[-1][1]]
-    factors=[{"name":n,"bull":"PASS" if f else "FAIL",
-      "bear":"PASS" if not f else "FAIL"} for n,f in zip(FACTORS,flags)]
-    bull=sum(flags)
-    bear=9-bull
+    daily_pairs=[
+      (close[-1]>e10,close[-1]<e10),
+      (e10>e30,e10<e30),
+      (close[-1]>sma200,close[-1]<sma200),
+      (e10>lag_e10,e10<lag_e10),
+      (close[-1]>mid20,close[-1]<mid20),
+      (rs20>0,rs20<0),
+      (sf["ad_change_5"]>0,sf["ad_change_5"]<0),
+      (close[-1]>close[-2],close[-1]<close[-2]),
+      (close[-1]>base[-1][1],close[-1]<base[-1][1])]
+    factors=[{"name":name,"bull":"PASS" if up else "FAIL",
+      "bear":"PASS" if down else "FAIL",
+      "neutral":not up and not down}
+      for name,(up,down) in zip(FACTORS,daily_pairs)]
+    bull=sum(up for up,_ in daily_pairs)
+    bear=sum(down for _,down in daily_pairs)
     # Daily mixed states must not be forced into bullish or bearish.
     bias="BULL" if bull>=7 else "BEAR" if bear>=7 else "MIXED"
     return {"status":"VERIFIED_PREVIOUS_SESSION_CONTEXT","asof":asof,
