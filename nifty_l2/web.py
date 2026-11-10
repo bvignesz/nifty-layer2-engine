@@ -209,7 +209,8 @@ def handler_for(app):
             elif path == '/strike-terminal':
                 try:
                     data=snapshots(app.runner.directory,parse_qs(urlparse(self.path).query))
-                    html='<html><meta charset="utf-8"><title>Stored Strike Snapshots</title><style>'+CSS+UI_CSS+'</style><main><p><a href="/">Home</a> · <a href="/desk">Options Desk</a></p>'+strike_history_html(data)+'</main></html>'
+                    content=strike_history_html(data).replace('action="/" method="get"','action="/strike-terminal" method="get"')
+                    html='<html><meta charset="utf-8"><title>Stored Strike Snapshots</title><style>'+CSS+UI_CSS+'</style><script defer src="/terminal.js"></script><main><p><a href="/">Home</a> · <a href="/desk">Options Desk</a></p>'+content+'</main></html>'
                     self.respond(200,html)
                 except (ValueError,OverflowError,IndexError,sqlite3.Error):
                     self.respond(400,'Invalid snapshot filters',content_type='text/plain; charset=utf-8')
