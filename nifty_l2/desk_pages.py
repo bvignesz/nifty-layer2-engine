@@ -35,6 +35,6 @@ def render_desk(data):
        '<p><a href="/api/v1/desk?date='+escape(data["date_ist"],quote=True)+
        '">JSON research desk readout</a></p></section>')
     html=html.replace('action="/microstructure"','action="/desk"')
-    html=html.replace('<a href="/">Home</a>','<a href="/">Home</a> · <a href="/microstructure">Raw microstructure</a>')
+    html=html.replace('<a href="/">Home</a>','<a href="/">Home</a> · <a href="/quantum">Quantum Alignment</a> · <a href="/swing">Swing Engine</a> · <a href="/microstructure">Raw microstructure</a>')
     html=html.replace('<div class="panel">',header+'<div class="panel">',1)
     return html
