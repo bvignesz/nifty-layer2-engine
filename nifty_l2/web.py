@@ -27,6 +27,7 @@ from .desk_readmodel import desk_snapshot
 from .desk_pages import render_desk
 from .live_feed_view import live_readmodel, render_live_feed
 from .swing_pages import swing_snapshot, render_swing
+from .chat_archive import read_chat_archive, render_chat_archive
 from .terminal_ui import history_html as strike_history_html
 from .home_dashboard import render_home
 from .quantum_pages import quantum_snapshot, render_quantum
@@ -199,7 +200,17 @@ def handler_for(app):
             if not self.authorized():
                 return
             path = urlparse(self.path).path
-            if path == '/quantum':
+            if path == '/chat-archive':
+                try:
+                    q=parse_qs(urlparse(self.path).query)
+                    data=read_chat_archive(app.runner.directory/"chat_archive.db",
+                      conversation_id=q.get("id",[None])[0],
+                      query=q.get("q",[""])[0])
+                    self.respond(200,render_chat_archive(data))
+                except (ValueError,OverflowError,sqlite3.Error):
+                    self.respond(400,"Invalid chat archive request",
+                      content_type="text/plain; charset=utf-8")
+            elif path == '/quantum':
                 self.respond(200,render_quantum(quantum_snapshot(app.runner.directory)))
             elif path == '/api/v1/quantum':
                 self.respond(200,json.dumps(quantum_snapshot(app.runner.directory),
