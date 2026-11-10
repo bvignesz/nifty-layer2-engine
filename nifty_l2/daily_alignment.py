@@ -4,7 +4,8 @@ These are nine *daily-context factors*, NOT the original nine option-chain
 checks. Requires verified day-completed historical OHLCV and benchmark.
 Never pretends daily OI walls, dealer inventory, or order-flow are available.
 """
-from datetime import date
+from datetime import date,timedelta
+from .market_calendar import session
 from math import isfinite
 from .storage import IST
 from eod_scanner.swing_setup_research import ema,features as swing_features
@@ -40,6 +41,17 @@ def evaluate_daily(bars,benchmark,*,asof):
     bench=_bars(benchmark,asof=day)
     if base[-1][0]!=bench[-1][0]:
         raise ValueError("index and benchmark session mismatch")
+    expected=None
+    for i in range(1,12):
+        d=day-timedelta(days=i)
+        try:
+            if session(d) is not None:
+                expected=d
+                break
+        except ValueError:
+            raise ValueError("daily session calendar not verified") from None
+    if expected is None or base[-1][0]!=expected:
+        raise ValueError("daily data does not end on last completed exchange session")
     close=[r[4] for r in base]
     benchclose=[r[4] for r in bench]
     e10=ema(close,10)
