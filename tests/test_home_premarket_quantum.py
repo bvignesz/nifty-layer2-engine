@@ -112,3 +112,22 @@ def test_home_and_quantum_pages_are_separate_and_no_duplicate_strike_table(tmp_p
             assert fragment in response.read()
     finally:
         client.close();server.shutdown();server.server_close();t.join()
+
+def test_official_rss_import_updates_home_news_without_changing_checks(tmp_path):
+    now=NOW
+    rss=(b"<rss><channel><item><title>RBI policy announcement</title>"
+         b"<link>https://www.rbi.org.in/Scripts/rss.aspx</link>"
+         b"<pubDate>Tue, 10 Nov 2026 02:30:00 GMT</pubDate>"
+         b"</item></channel></rss>")
+    dest=tmp_path/"premarket-brief.json"
+    current={"date_ist":"2026-11-10","observed_at_utc":NOW.isoformat(),
+        "checks":{"INDIA_VIX":{"status":"VERIFIED","note":"observed",
+                              "observed_at_utc":NOW.isoformat()}},"news":[]}
+    dest.write_text(json.dumps(current))
+    out=refresh_news(dest,now=now,fetch=lambda _:rss)
+    assert out["status"]=="OFFICIAL_RSS_REFRESHED"
+    assert dest.stat().st_mode&0o777==0o600
+    updated=json.loads(dest.read_text())
+    assert updated["checks"]==current["checks"]
+    assert updated["news"][0]["title"]=="RBI policy announcement"
+    assert read_brief(tmp_path,now=now)["market_session"]=="EXCHANGE_CLOSED"
