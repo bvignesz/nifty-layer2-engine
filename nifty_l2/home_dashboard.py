@@ -32,7 +32,8 @@ def render_home(app,message=""):
     brief=read_brief(app.runner.directory)
     csrf='<input type="hidden" name="csrf" value="'+_e(app.csrf)+'">'
     def button(action,label):
-        return '<form method="post" action="'+action+'">'+csrf+'<button>'+_e(label)+'</button></form>'
+        extra=' target="_blank"' if action=="/connect" and app.origin.startswith("http:") else ""
+        return '<form method="post" action="'+action+'"'+extra+'>'+csrf+'<button>'+_e(label)+'</button></form>'
     # Compatibility with private manual-login callback route.
     manual=(
       '<form method="post" action="/oauth/callback">'+csrf+
